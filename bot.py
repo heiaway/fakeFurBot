@@ -52,7 +52,7 @@ def main():
             check_comment_id(comment.id)
             or comment.author.name.lower() == file_info[3].lower()
         ):
-            add_comment_id()
+            add_comment_id(comment.id)
             continue
         else:
             print(f"processing #{comment.id}")
@@ -176,7 +176,7 @@ print("Bot started")
 while True:
     try:
         main()
-    except praw.exception.APIException:
+    except praw.exceptions.APIException:
         print("Reddit most likely returned 503.")
         print("Waiting for 60 seconds.")
         time.sleep(60)
