@@ -63,10 +63,11 @@ def main():
         text_lines = [x.lower() for x in comment.body.split("\n")]
 
         # then check if there's actually a command
+        # this means if all lines DO NOT have the command, skip.
         if all(["furbot search" not in line for line in text_lines]):
-            print(f"processing #{comment.id}")
             continue
 
+        print(f"processing #{comment.id}")
         for line in text_lines:
             # find earlier search command and get the tags
             regex = re.search(r"furbot search (.+)", line)
@@ -82,14 +83,14 @@ def main():
         if len(search_tags) >= 15:
             print("replying...")
             message_body = (
-                f"Hello, {comment.author.name}. Here are the results for your search:"
-                ""
-                f"{' '.join(search_tags)}"
-                ""
-                f"There are more than 15 tags. Please try searching with fewer tags."
-                ""
-                "---"
-                f"I am a bot and a quick and temporary replacement for the real and original furbot. Contact \/u\/heittoaway if this bot is going crazy or for more information."
+                f"Hello, {comment.author.name}. Here are the results for your search:\n"
+                "\n"
+                f"{' '.join(search_tags)}\n"
+                "\n"
+                f"There are more than 15 tags. Please try searching with fewer tags.\n"
+                "\n"
+                "---\n"
+                f"I am a bot and a quick and temporary replacement for the real and original furbot. Contact \/u\/heittoaway if this bot is going crazy or for more information.\n"
             )
             add_comment_id(comment.id)
             comment.reply(message_body)
