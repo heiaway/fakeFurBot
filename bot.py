@@ -54,8 +54,6 @@ def main():
         ):
             add_comment_id(comment.id)
             continue
-        else:
-            print(f"processing #{comment.id}")
 
         # remove backslashes, since occasionally they will mess up searches with
         # escaped underscores: e.g. long\_tag\_thing
@@ -66,6 +64,7 @@ def main():
 
         # then check if there's actually a command
         if all(["furbot search" not in line for line in text_lines]):
+            print(f"processing #{comment.id}")
             continue
 
         for line in text_lines:
@@ -79,8 +78,25 @@ def main():
         # parse tags into list
         search_tags = regex_result.split(" ")
 
+        # prevent bot abuse
+        if len(search_tags) >= 15:
+            print("replying...")
+            message_body = (
+                f"Hello, {comment.author.name}. Here are the results for your search:"
+                ""
+                f"{' '.join(search_tags)}"
+                ""
+                f"There are more than 15 tags. Please try searching with fewer tags."
+                ""
+                "---"
+                f"I am a bot and a quick and temporary replacement for the real and original furbot. Contact \/u\/heittoaway if this bot is going crazy or for more information."
+            )
+            add_comment_id(comment.id)
+            comment.reply(message_body)
+            print("replied with too many tags")
+
         # make a search link out of them, and fetch the result_json
-        base_link = "https://e621.net/posts.json?tags=order%3Arandom+score%3A>19+-gore+-castration+-feces+-scat+-hard_vore"
+        base_link = "https://e621.net/posts.json?tags=order%3Arandom+score%3A>19+-gore+-castration+-feces+-scat+-hard_vore+-cub"
         r = requests.get(base_link + "+" + "+".join(search_tags), headers=header)
         r.raise_for_status()
         result_json = r.text
@@ -93,6 +109,7 @@ def main():
             # test if score was the problem by requesting another list from the site,
             # but wait for a second to definitely not hit the limit rate
             time.sleep(1)
+
             unscored_base_link = "https://e621.net/posts.json?tags=order%3Arandom+-gore+-castration+-feces+-scat+-hard_vore"
 
             # then we can make a link text without score limit
@@ -140,27 +157,27 @@ def main():
         if len(tag_list) == 0:
             tags_message = ""
         else:
+            # combine tags into the small message and replace "_" characters in the tag list with "\_" to avoid Reddit's markup
             tags_message = (
                 f"\n\n**^^^^Post ^^^^Tags:** ^^^^{' ^^^^'.join(tag_list)}\n\n"
-            )
+            ).replace("_", "\_")
 
         # compose the final message.
-        message_body = f"""\
-                        Hello, {comment.author.name}. Here are the results for your search:
-
-                        {" ".join(search_tags)}
-
-                        {link_text}{tags_message}
-
-                        ---
-
-                        I am a bot and a quick and temporary replacement for the real and original furbot. Contact \/u\/heittoaway if this bot is going crazy or for more information.\
-                        """
+        message_body = (
+            f"Hello, {comment.author.name}. Here are the results for your search:\n"
+            "\n"
+            f"{' '.join(search_tags)}\n"
+            "\n"
+            f"{link_text}{tags_message}\n"
+            "\n"
+            "---\n"
+            f"I am a bot and a quick and temporary replacement for the real and original furbot. Contact \/u\/heittoaway if this bot is going crazy or for more information."
+        )
 
         print("replying...")
         add_comment_id(comment.id)
         # dedent fixes the indentations from above, so the message doesn't appear as a code block
-        comment.reply(dedent(message_body))
+        comment.reply(message_body)
         print("succesfully replied")
 
         # this makes the bot wait after handling a new comment
