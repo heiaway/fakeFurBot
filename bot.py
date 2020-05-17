@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-import praw
 import json
-import time
-import re
-import requests
 import logging
+import re
+import time
+from datetime import datetime
 
-# to fix ugly multiline strings
-from textwrap import dedent
-
+import praw
+import requests
 
 # open file in current working directory, so hopefully the same as the script's directory
 with open("login.txt", "r") as f:
@@ -82,9 +80,7 @@ def process_comment(comment):
     if len(search_tags) >= 15:
         print("replying...")
         message_body = (
-            f"Hello, {comment.author.name}. Here are the results for your search:\n"
-            "\n"
-            f"{' '.join(search_tags)}\n"
+            f"Hello, {comment.author.name}.\n"
             "\n"
             f"There are more than 15 tags. Please try searching with fewer tags.\n"
             "\n"
@@ -162,6 +158,7 @@ def process_comment(comment):
         tags_message = (
             f"**^^Post ^^Tags:** ^^{' ^^'.join(tag_list[:tag_cutoff])}"
         ).replace("_", "\_")
+        # if there are more than 25 add additional message
         if len(tag_list) > tag_cutoff:
             tags_message += f" ^^and ^^{len(tag_list) - tag_cutoff} ^^more ^^tags"
 
@@ -182,9 +179,8 @@ def process_comment(comment):
 
     print("replying...")
     add_comment_id(comment.id)
-    # dedent fixes the indentations from above, so the message doesn't appear as a code block
     comment.reply(message_body)
-    print("succesfully replied")
+    print(f"succesfully replied at {datetime.now()}")
 
     # this makes the bot wait after handling a new comment
     # it should slow down any loops and nicely prevents the bot from exceeding e621's request limit rate
@@ -205,9 +201,11 @@ print("Bot started")
 # This might have been changed in a recent PRAW update, but I'm not exactly sure if it works so this can stay
 while True:
     try:
+        print(f"Starting at {datetime.now()}")
         wrapper()
-    except praw.exceptions.APIException:
-        print("Reddit most likely returned 503.")
+    except praw.exceptions.RedditAPIException as e:
+        print(e)
+        logging.exception("Caugh a Reddit API error.")
         print("Waiting for 60 seconds.")
         time.sleep(60)
     except requests.exceptions.HTTPError as e:
