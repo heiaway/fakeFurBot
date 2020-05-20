@@ -2,6 +2,7 @@
 import json
 import logging
 import re
+import threading
 import time
 from datetime import datetime
 
@@ -17,17 +18,51 @@ with open("login.txt", "r") as f:
 
 
 # log in to reddit and set subreddit
-reddit = praw.Reddit(
+bot_reddit = praw.Reddit(
     client_id=file_info[0],
     client_secret=file_info[1],
     password=file_info[2],
     user_agent="/r/Furry_irl bot by /u/heittoaway",
     username=file_info[3],
 )
-subreddit = reddit.subreddit("furry_irl")
+subreddit = bot_reddit.subreddit("furry_irl")
+
+deleter_reddit = praw.Reddit(
+    client_id=file_info[0],
+    client_secret=file_info[1],
+    password=file_info[2],
+    user_agent="/r/Furry_irl bot by /u/heittoaway",
+    username=file_info[3],
+)
+
+# change the name to be clearer since the bot's name will be used later
+bot_username = file_info[3]
 
 # requests user agent header
 header = {"User-Agent": "/r/Furry_irl FakeFurBot by reddit.com/u/heittoaway"}
+
+
+def deleter_function(deleter_reddit):
+    # get an Redditor instance of current user (aka the bot)
+    user = deleter_reddit.user.me()
+    try:
+        print(f"DELETER: Starting deleter at {datetime.now()}")
+        while True:
+            # the first 200 comments ought to be enough, and should
+            # limit the amount of time spent on this simple task
+            comments = user.comments.new(limit=200)
+            for comment in comments:
+                if comment.score < 0:
+                    print(
+                        f"DELETER: Removing comment #{comment.id} at {datetime.now()} due to its low score ({comment.score})."
+                    )
+                    comment.delete()
+            # check every ~10 minutes
+            time.sleep(600)
+    except Exception as e:
+        logging.exception("DELETER: Caught an unknown exception.")
+        print("DELETER: Waiting for 120 seconds before resuming")
+        time.sleep(120)
 
 
 def check_comment_id(id):
@@ -42,12 +77,20 @@ def add_comment_id(id):
         f.write(f"{id}\n")
 
 
-# moved everything to a function to use return
 def process_comment(comment):
+    # constants:
+    COMMENT_FOOTER = (
+        "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating. ^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\(safe\), ^^`rating:q` ^^\(questionable\), ^^`rating:e` ^^\(explicit\), ^^or ^^a ^^combination ^^of ^^them."
+        "\n"
+        "\n"
+        "^^I ^^am ^^a ^^bot ^^and ^^a ^^quick ^^and ^^temporary ^^replacement ^^for ^^the ^^real ^^and ^^original ^^furbot. "
+        "^^Any ^^comments ^^below ^^0 ^^score ^^will ^^be ^^removed. "
+        "^^Please ^^contact ^^\/u\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy ^^or ^^for ^^more ^^information.\n"
+    )
     # if id is not new, or the author has the same name as the bot's user, skip it.
     if (
         check_comment_id(comment.id)
-        or comment.author.name.lower() == file_info[3].lower()
+        or comment.author.name.lower() == bot_username.lower()
     ):
         add_comment_id(comment.id)
         return
@@ -56,18 +99,18 @@ def process_comment(comment):
     # escaped underscores: e.g. long\_tag\_thing
     comment_body = comment.body.replace("\\", "")
 
-    # take comment text and split into lines and turn into lowercase
-    text_lines = [x.lower() for x in comment.body.split("\n")]
+    # take comment text and split into lines
+    text_lines = comment.body.split("\n")
 
     # then check if there's actually a command
     # this means if all lines DO NOT have the command, skip.
-    if all(["furbot search" not in line for line in text_lines]):
+    if all(["furbot search" not in line.lower() for line in text_lines]):
         return
 
     print(f"processing #{comment.id}")
     for line in text_lines:
         # find earlier search command and get the tags
-        regex = re.search(r"furbot search (.+)", line)
+        regex = re.search(r"furbot search (.+)", line.lower())
         # we don't need multiple matches so break out
         if regex:
             regex_result = regex.group(1)
@@ -76,7 +119,7 @@ def process_comment(comment):
     # parse tags into list
     search_tags = regex_result.split(" ")
 
-    # prevent bot abuse
+    # prevent bot abuse with too many tags
     if len(search_tags) >= 15:
         print("replying...")
         message_body = (
@@ -84,8 +127,7 @@ def process_comment(comment):
             "\n"
             f"There are more than 15 tags. Please try searching with fewer tags.\n"
             "\n"
-            "---\n"
-            f"I am a bot and a quick and temporary replacement for the real and original furbot. Contact \/u\/heittoaway if this bot is going crazy or for more information.\n"
+            "---\n" + COMMENT_FOOTER
         )
         add_comment_id(comment.id)
         comment.reply(message_body)
@@ -173,8 +215,7 @@ def process_comment(comment):
         f"{tags_message}\n"
         "\n"
         "---\n"
-        "\n"
-        "I am a bot and a quick and temporary replacement for the real and original furbot. Contact \/u\/heittoaway if this bot is going crazy or for more information."
+        "\n" + COMMENT_FOOTER
     )
 
     print("replying...")
@@ -194,6 +235,13 @@ def wrapper():
         process_comment(comment)
 
 
+# launch comment deleter in its own thread and pass its Reddit instance to it
+print("Creating and starting deleter_thread")
+deleter_thread = threading.Thread(
+    target=deleter_function, args=(deleter_reddit,), daemon=True
+)
+deleter_thread.start()
+
 print("Bot started")
 # since PRAW doesn't handle the usual 503 errors caused by reddit's awful servers,
 # they have to be handled manually. Additionally, whenever an error is raised, the
@@ -205,18 +253,18 @@ while True:
         wrapper()
     except praw.exceptions.RedditAPIException as e:
         print(e)
-        logging.exception("Caugh a Reddit API error.")
+        logging.exception("Caught a Reddit API error.")
         print("Waiting for 60 seconds.")
         time.sleep(60)
     except requests.exceptions.HTTPError as e:
-        logging.exception("Caugh an HTTPError.")
+        logging.exception("Caught an HTTPError.")
         print("Waiting for 60 seconds.")
         time.sleep(60)
     except requests.RequestException as e:
-        logging.exception("Caugh an exception from requests.")
+        logging.exception("Caught an exception from requests.")
         print("Waiting for 60 seconds.")
         time.sleep(60)
     except Exception as e:
-        logging.exception("Caugh an unknown exception.")
+        logging.exception("Caught an unknown exception.")
         print("Waiting for 120 seconds.")
         time.sleep(120)
