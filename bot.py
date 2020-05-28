@@ -56,6 +56,7 @@ def deleter_function(deleter_reddit):
                     print(
                         f"DELETER: Removing comment #{comment.id} at {datetime.now()} due to its low score ({comment.score})."
                     )
+                    print(f"'{comment.body}'")
                     comment.delete()
             # check every ~10 minutes
             time.sleep(600)
@@ -80,7 +81,7 @@ def add_comment_id(id):
 def process_comment(comment):
     # constants:
     COMMENT_FOOTER = (
-        "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating. ^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\(safe\), ^^`rating:q` ^^\(questionable\), ^^`rating:e` ^^\(explicit\), ^^or ^^a ^^combination ^^of ^^them."
+        "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating. ^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\(safe\), ^^`rating:q` ^^\(questionable\), ^^or ^^`rating:e` ^^\(explicit\)."
         "\n"
         "\n"
         "^^I ^^am ^^a ^^bot ^^and ^^a ^^quick ^^and ^^temporary ^^replacement ^^for ^^the ^^real ^^and ^^original ^^furbot. "
@@ -108,6 +109,8 @@ def process_comment(comment):
         return
 
     print(f"processing #{comment.id}")
+    # assign regex_result as None to get around fringe case where the user inputs only furbot search and nothing else
+    regex_result = None
     for line in text_lines:
         # find earlier search command and get the tags
         regex = re.search(r"furbot search (.+)", line.lower())
@@ -117,15 +120,18 @@ def process_comment(comment):
             break
 
     # parse tags into list
-    search_tags = regex_result.split(" ")
+    if regex_result:
+        search_tags = regex_result.split(" ")
+    else:
+        search_tags = []
 
     # prevent bot abuse with too many tags
-    if len(search_tags) >= 15:
+    if len(search_tags) >= 20:
         print("replying...")
         message_body = (
             f"Hello, {comment.author.name}.\n"
             "\n"
-            f"There are more than 15 tags. Please try searching with fewer tags.\n"
+            f"There are more than 20 tags. Please try searching with fewer tags.\n"
             "\n"
             "---\n" + COMMENT_FOOTER
         )
@@ -135,8 +141,8 @@ def process_comment(comment):
         return
 
     # make a search link out of them, and fetch the result_json
-    base_link = "https://e621.net/posts.json?tags=order%3Arandom+score%3A>19+-gore+-castration+-feces+-scat+-hard_vore+-cub"
-    r = requests.get(base_link + "+" + "+".join(search_tags), headers=header)
+    BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom+score%3A>19+-gore+-castration+-feces+-scat+-hard_vore+-cub+-urine+-loli+-shota"
+    r = requests.get(BASE_LINK + "+" + "+".join(search_tags), headers=header)
     r.raise_for_status()
     result_json = r.text
 
@@ -149,11 +155,11 @@ def process_comment(comment):
         # but wait for a second to definitely not hit the limit rate
         time.sleep(1)
 
-        unscored_base_link = "https://e621.net/posts.json?tags=order%3Arandom+-gore+-castration+-feces+-scat+-hard_vore"
+        UNSCORED_BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom+-gore+-castration+-feces+-scat+-hard_vore+-cub+-urine+-loli+-shota"
 
-        # then we can make a link text without score limit
+        # then we can make a link text without score limit and retrieve the results
         r = requests.get(
-            unscored_base_link + "+" + "+".join(search_tags), headers=header
+            UNSCORED_BASE_LINK + "+" + "+".join(search_tags), headers=header
         )
         r.raise_for_status()
         unscored_result_json = r.text
@@ -187,11 +193,10 @@ def process_comment(comment):
         if first_post["file"]["ext"] == "swf":
             direct_link = "Direct links do not work properly with flash animations. Please check the post."
         else:
-            # for some reason putting the thing below straight into the f-string is invalid syntax?
-            dlink = first_post["file"]["url"]
-            direct_link = f"[Direct Link]({dlink})"
+            direct_link = f"[Direct Link]({first_post['file']['url']})"
         link_text = f"[Post]({page_url}) | {direct_link}"
 
+    # create the small tag list
     if len(tag_list) == 0:
         tags_message = ""
     else:
@@ -200,13 +205,19 @@ def process_comment(comment):
         tags_message = (
             f"**^^Post ^^Tags:** ^^{' ^^'.join(tag_list[:tag_cutoff])}"
         ).replace("_", "\_")
-        # if there are more than 25 add additional message
+        # if there are more than 25, add an additional message
         if len(tag_list) > tag_cutoff:
             tags_message += f" ^^and ^^{len(tag_list) - tag_cutoff} ^^more ^^tags"
 
-    # compose the final message.
+    # compose the final message
+    # here we handle a fringe case where the user inputs "furbot search" without any tags and give an explanation for the result
+    if len(search_tags) == 0:
+        explanation_text = "It seems that you did not input any tags in your search. Anyway, here is a random result from e621:"
+    else:
+        explanation_text = "Here are the results for your search:"
+
     message_body = (
-        f"Hello, {comment.author.name}. Here are the results for your search:\n"
+        f"Hello, {comment.author.name}. {explanation_text}\n"
         "\n"
         f"{' '.join(search_tags)}\n"
         "\n"
@@ -265,6 +276,8 @@ while True:
         print("Waiting for 60 seconds.")
         time.sleep(60)
     except Exception as e:
-        logging.exception("Caught an unknown exception.")
+        logging.exception(
+            "Caught an unknown exception. A repeating 503 error caused by overloaded servers on Reddit may be the cause."
+        )
         print("Waiting for 120 seconds.")
         time.sleep(120)
