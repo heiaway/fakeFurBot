@@ -9,6 +9,9 @@ from datetime import datetime
 import praw
 import requests
 
+# this is so we can handle the 503 errors caused by Reddit's servers being awful
+from prawcore.exceptions import ServerError
+
 # open file in current working directory, so hopefully the same as the script's directory
 with open("login.txt", "r") as f:
     # file format is: client_id,client_secret,password,username
@@ -263,7 +266,6 @@ while True:
         print(f"Starting at {datetime.now()}")
         wrapper()
     except praw.exceptions.RedditAPIException as e:
-        print(e)
         logging.exception("Caught a Reddit API error.")
         print("Waiting for 60 seconds.")
         time.sleep(60)
@@ -275,9 +277,13 @@ while True:
         logging.exception("Caught an exception from requests.")
         print("Waiting for 60 seconds.")
         time.sleep(60)
-    except Exception as e:
+    except ServerError as e:
         logging.exception(
-            "Caught an unknown exception. A repeating 503 error caused by overloaded servers on Reddit may be the cause."
+            "Caught an exception from prawcore caused by Reddit's 503 answers. They happen often during prime time."
         )
+        print("Waiting for 300 seconds.")
+        time.sleep(300)
+    except Exception as e:
+        logging.exception("Caught an unknown exception.")
         print("Waiting for 120 seconds.")
         time.sleep(120)
