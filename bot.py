@@ -65,8 +65,8 @@ def deleter_function(deleter_reddit):
             time.sleep(600)
     except Exception as e:
         logging.exception("DELETER: Caught an unknown exception.")
-        print("DELETER: Waiting for 120 seconds before resuming")
-        time.sleep(120)
+        print("DELETER: Waiting for 300 seconds before resuming")
+        time.sleep(300)
 
 
 def check_comment_id(id):
@@ -91,11 +91,8 @@ def process_comment(comment):
         "^^Any ^^comments ^^below ^^0 ^^score ^^will ^^be ^^removed. "
         "^^Please ^^contact ^^\/u\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy ^^or ^^for ^^more ^^information.\n"
     )
-    # if id is not new, or the author has the same name as the bot's user, skip it.
-    if (
-        check_comment_id(comment.id)
-        or comment.author.name.lower() == bot_username.lower()
-    ):
+    # if id is not new (=the bot has replied to it), or the author has the same name as the bot's user, skip it.
+    if check_comment_id(comment.id) or comment.author.name.lower() == bot_username.lower():
         add_comment_id(comment.id)
         return
 
@@ -161,9 +158,7 @@ def process_comment(comment):
         UNSCORED_BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom+-gore+-castration+-feces+-scat+-hard_vore+-cub+-urine+-loli+-shota"
 
         # then we can make a link text without score limit and retrieve the results
-        r = requests.get(
-            UNSCORED_BASE_LINK + "+" + "+".join(search_tags), headers=header
-        )
+        r = requests.get(UNSCORED_BASE_LINK + "+" + "+".join(search_tags), headers=header)
         r.raise_for_status()
         unscored_result_json = r.text
 
@@ -194,7 +189,9 @@ def process_comment(comment):
 
         # Check for swf/flash first before setting direct link to full image.
         if first_post["file"]["ext"] == "swf":
-            direct_link = "Direct links do not work properly with flash animations. Please check the post."
+            direct_link = (
+                "Direct links do not work properly with flash animations. Please check the post."
+            )
         else:
             direct_link = f"[Direct Link]({first_post['file']['url']})"
         link_text = f"[Post]({page_url}) | {direct_link}"
@@ -204,13 +201,11 @@ def process_comment(comment):
         tags_message = ""
     else:
         # combine first tag_cutoff amount of tags into the small message and replace "_" characters in the tag list with "\_" to avoid Reddit's markup
-        tag_cutoff = 25
-        tags_message = (
-            f"**^^Post ^^Tags:** ^^{' ^^'.join(tag_list[:tag_cutoff])}"
-        ).replace("_", "\_")
+        TAG_CUTOFF = 25
+        tags_message = (f"**^^Post ^^Tags:** ^^{' ^^'.join(tag_list[:TAG_CUTOFF])}").replace("_", "\_")
         # if there are more than 25, add an additional message
-        if len(tag_list) > tag_cutoff:
-            tags_message += f" ^^and ^^{len(tag_list) - tag_cutoff} ^^more ^^tags"
+        if len(tag_list) > TAG_CUTOFF:
+            tags_message += f" ^^and ^^{len(tag_list) - TAG_CUTOFF} ^^more ^^tags"
 
     # compose the final message
     # here we handle a fringe case where the user inputs "furbot search" without any tags and give an explanation for the result
@@ -251,9 +246,7 @@ def wrapper():
 
 # launch comment deleter in its own thread and pass its Reddit instance to it
 print("Creating and starting deleter_thread")
-deleter_thread = threading.Thread(
-    target=deleter_function, args=(deleter_reddit,), daemon=True
-)
+deleter_thread = threading.Thread(target=deleter_function, args=(deleter_reddit,), daemon=True)
 deleter_thread.start()
 
 print("Bot started")
