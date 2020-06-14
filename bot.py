@@ -65,7 +65,7 @@ def deleter_function(deleter_reddit):
             time.sleep(600)
     except Exception as e:
         logging.exception("DELETER: Caught an unknown exception.")
-        print("DELETER: Waiting for 300 seconds before resuming")
+        logging.info("DELETER: Waiting for 300 seconds before resuming")
         time.sleep(300)
 
 
@@ -101,7 +101,7 @@ def process_comment(comment):
     comment_body = comment.body.replace("\\", "")
 
     # take comment text and split into lines
-    text_lines = comment.body.split("\n")
+    text_lines = comment_body.split("\n")
 
     # then check if there's actually a command
     # this means if all lines DO NOT have the command, skip.
@@ -133,7 +133,8 @@ def process_comment(comment):
             "\n"
             f"There are more than 20 tags. Please try searching with fewer tags.\n"
             "\n"
-            "---\n" + COMMENT_FOOTER
+            "---\n"
+            "\n" + COMMENT_FOOTER
         )
         add_comment_id(comment.id)
         comment.reply(message_body)
@@ -205,7 +206,7 @@ def process_comment(comment):
         tags_message = (f"**^^Post ^^Tags:** ^^{' ^^'.join(tag_list[:TAG_CUTOFF])}").replace("_", "\_")
         # if there are more than 25, add an additional message
         if len(tag_list) > TAG_CUTOFF:
-            tags_message += f" ^^and ^^{len(tag_list) - TAG_CUTOFF} ^^more ^^tags"
+            tags_message += f" **^^and ^^{len(tag_list) - TAG_CUTOFF} ^^more ^^tags**"
 
     # compose the final message
     # here we handle a fringe case where the user inputs "furbot search" without any tags and give an explanation for the result
@@ -228,8 +229,8 @@ def process_comment(comment):
     )
 
     print("replying...")
-    add_comment_id(comment.id)
     comment.reply(message_body)
+    add_comment_id(comment.id)
     print(f"succesfully replied at {datetime.now()}")
 
     # this makes the bot wait after handling a new comment
@@ -258,25 +259,25 @@ while True:
     try:
         print(f"Starting at {datetime.now()}")
         wrapper()
-    except praw.exceptions.RedditAPIException as e:
+    except praw.exceptions.RedditAPIException:
         logging.exception("Caught a Reddit API error.")
-        print("Waiting for 60 seconds.")
+        logging.info("Waiting for 60 seconds.")
         time.sleep(60)
-    except requests.exceptions.HTTPError as e:
+    except requests.exceptions.HTTPError:
         logging.exception("Caught an HTTPError.")
-        print("Waiting for 60 seconds.")
+        logging.info("Waiting for 60 seconds.")
         time.sleep(60)
-    except requests.RequestException as e:
+    except requests.RequestException:
         logging.exception("Caught an exception from requests.")
-        print("Waiting for 60 seconds.")
+        logging.info("Waiting for 60 seconds.")
         time.sleep(60)
-    except ServerError as e:
-        logging.exception(
-            "Caught an exception from prawcore caused by Reddit's 503 answers. They happen often during prime time."
+    except ServerError:
+        logging.warning(
+            "Caught an exception from prawcore caused by Reddit's 503 answers due to overloaded servers."
         )
-        print("Waiting for 300 seconds.")
+        logging.info("Waiting for 300 seconds.")
         time.sleep(300)
-    except Exception as e:
+    except Exception:
         logging.exception("Caught an unknown exception.")
-        print("Waiting for 120 seconds.")
+        logging.info("Waiting for 120 seconds.")
         time.sleep(120)
