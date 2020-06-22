@@ -201,9 +201,12 @@ def process_comment(comment):
     if len(tag_list) == 0:
         tags_message = ""
     else:
-        # combine first tag_cutoff amount of tags into the small message and replace "_" characters in the tag list with "\_" to avoid Reddit's markup
+        # combine first tag_cutoff amount of tags into the small message and
+        # replace "_" and similar characters in the tag list with escaped ones (e.g. "\_") to avoid Reddit's markup
         TAG_CUTOFF = 25
-        tags_message = (f"**^^Post ^^Tags:** ^^{' ^^'.join(tag_list[:TAG_CUTOFF])}").replace("_", "\_")
+        # clean up tag list from markdown characters
+        tag_list = [tag.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`") for tag in tag_list]
+        tags_message = f"**^^Post ^^Tags:** ^^{' ^^'.join(tag_list[:TAG_CUTOFF])}"
         # if there are more than 25, add an additional message
         if len(tag_list) > TAG_CUTOFF:
             tags_message += f" **^^and ^^{len(tag_list) - TAG_CUTOFF} ^^more ^^tags**"
@@ -214,6 +217,11 @@ def process_comment(comment):
         explanation_text = "It seems that you did not input any tags in your search. Anyway, here is a random result from e621:"
     else:
         explanation_text = "Here are the results for your search:"
+
+    # fix underscores etc markdown formatting characters from search_tags
+    search_tags = [
+        tag.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`") for tag in search_tags
+    ]
 
     message_body = (
         f"Hello, {comment.author.name}. {explanation_text}\n"
