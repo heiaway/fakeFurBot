@@ -96,7 +96,6 @@ def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
     )
     r.raise_for_status()
     result_json = r.text
-    print(r.text)
 
     # parse the response json into a list of dicts, where each post is a dict
     return list(json.loads(result_json)["posts"])
