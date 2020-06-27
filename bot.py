@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.8
 import json
 import logging
 import re
@@ -81,6 +81,27 @@ def add_comment_id(id):
         f.write(f"{id}\n")
 
 
+def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
+    # make a search link out of them, and fetch the result_json
+    BASE_LINK = (
+        "https://e621.net/posts.json?tags=order%3Arandom+score%3A>19" + "+-" + "+-".join(TAG_BLACKLIST)
+    )
+    UNSCORED_BASE_LINK = (
+        "https://e621.net/posts.json?tags=order%3Arandom" + "+-" + "+-".join(TAG_BLACKLIST)
+    )
+
+    r = requests.get(
+        (UNSCORED_BASE_LINK if no_score_limit else BASE_LINK) + "+" + "+".join(search_tags),
+        headers=header,
+    )
+    r.raise_for_status()
+    result_json = r.text
+    print(r.text)
+
+    # parse the response json into a list of dicts, where each post is a dict
+    return list(json.loads(result_json)["posts"])
+
+
 def process_comment(comment):
     # constants:
     COMMENT_FOOTER = (
@@ -91,6 +112,22 @@ def process_comment(comment):
         "^^Any ^^comments ^^below ^^0 ^^score ^^will ^^be ^^removed. "
         "^^Please ^^contact ^^\/u\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy ^^or ^^for ^^more ^^information.\n"
     )
+    TAG_BLACKLIST = [
+        "gore",
+        "castration",
+        "feces",
+        "poop",
+        "scat",
+        "hard_vore",
+        "cub",
+        "urine",
+        "pee",
+        "watersports",
+        "child",
+        "loli",
+        "shota",
+        "infestation",
+    ]
     # if id is not new (=the bot has replied to it), or the author has the same name as the bot's user, skip it.
     if check_comment_id(comment.id) or comment.author.name.lower() == bot_username.lower():
         add_comment_id(comment.id)
@@ -140,36 +177,41 @@ def process_comment(comment):
         comment.reply(message_body)
         print("replied with too many tags")
         return
+    # cancel search for blacklisted tags
+    # if any search tag is in the blacklist
+    if len(intersection := set(search_tags) & set(TAG_BLACKLIST)) != 0:
+        print("replying...")
+        message_body = (
+            f"Hello, {comment.author.name}.\n"
+            "\n"
+            f"The following tags are blacklisted and were in your search: {' '.join(intersection)}\n"
+            "\n"
+            "---\n"
+            "\n" + COMMENT_FOOTER
+        )
+        add_comment_id(comment.id)
+        comment.reply(message_body)
+        print("replied with blacklist")
+        return
 
-    # make a search link out of them, and fetch the result_json
-    BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom+score%3A>19+-gore+-castration+-feces+-scat+-hard_vore+-cub+-urine+-loli+-shota"
-    r = requests.get(BASE_LINK + "+" + "+".join(search_tags), headers=header)
-    r.raise_for_status()
-    result_json = r.text
-
-    # parse the response json into a list of dicts, where each post is a dict
-    posts = list(json.loads(result_json)["posts"])
+    posts = search(search_tags, TAG_BLACKLIST)
 
     # create the Post | Direct link text
+    # if no posts were found, search again to make error message more specific
     if len(posts) == 0:
         # test if score was the problem by requesting another list from the site,
         # but wait for a second to definitely not hit the limit rate
         time.sleep(1)
-
-        UNSCORED_BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom+-gore+-castration+-feces+-scat+-hard_vore+-cub+-urine+-loli+-shota"
-
-        # then we can make a link text without score limit and retrieve the results
-        r = requests.get(UNSCORED_BASE_LINK + "+" + "+".join(search_tags), headers=header)
-        r.raise_for_status()
-        unscored_result_json = r.text
-
+        # re-search posts without the score limit
+        posts = search(search_tags, TAG_BLACKLIST, no_score_limit=True)
         # which we use to explain why there were no results,
         # since the bot can sometimes be confusing to use
-        if len(list(json.loads(unscored_result_json)["posts"])) == 0:
+        if len(posts) == 0:
             link_text = "No results found. You may have an invalid tag, or all possible results had blacklisted tags."
         else:
             link_text = "No results found. All results had a score below 20."
         tag_list = []
+    # and if posts were found, process the first one
     else:
         # select first post
         first_post = posts[0]
