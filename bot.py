@@ -42,7 +42,12 @@ deleter_reddit = praw.Reddit(
 bot_username = file_info[3]
 
 # requests user agent header
-header = {"User-Agent": "/r/Furry_irl FakeFurBot by reddit.com/u/heittoaway"}
+E621_HEADER = {"User-Agent": "/r/Furry_irl FakeFurBot by reddit.com/u/heittoaway"}
+
+# we have must log in to e621 since otherwise
+# the API will give "null" on any post's url that
+# contains tags that are on the global blacklist
+e621_auth = (file_info[4], file_info[5])
 
 
 def deleter_function(deleter_reddit):
@@ -92,7 +97,8 @@ def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
 
     r = requests.get(
         (UNSCORED_BASE_LINK if no_score_limit else BASE_LINK) + "+" + "+".join(search_tags),
-        headers=header,
+        headers=E621_HEADER,
+        auth=e621_auth,
     )
     r.raise_for_status()
     result_json = r.text
