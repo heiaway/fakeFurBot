@@ -14,7 +14,7 @@ from prawcore.exceptions import ServerError
 
 # open file in current working directory, so hopefully the same as the script's directory
 with open("login.txt", "r") as f:
-    # file format is: client_id,client_secret,password,username
+    # file format is: client_id,client_secret,password,username,e621_username,e621_key
     file_info = f.read().split(",")
     # strip spaces just to be sure
     file_info = [x.strip() for x in file_info]
@@ -87,19 +87,20 @@ def add_comment_id(id):
 
 
 def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
-    # make a search link out of them, and fetch the result_json
-    BASE_LINK = (
-        "https://e621.net/posts.json?tags=order%3Arandom+score%3A>19" + "+-" + "+-".join(TAG_BLACKLIST)
-    )
-    UNSCORED_BASE_LINK = (
-        "https://e621.net/posts.json?tags=order%3Arandom" + "+-" + "+-".join(TAG_BLACKLIST)
-    )
+    BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom+score%3A>19"
+    UNSCORED_BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom"
+    # determine if the search is guaranteed to be sfw or not
+    is_safe = ("rating:s" in search_tags) or ("rating:safe" in search_tags)
 
-    r = requests.get(
-        (UNSCORED_BASE_LINK if no_score_limit else BASE_LINK) + "+" + "+".join(search_tags),
-        headers=E621_HEADER,
-        auth=e621_auth,
-    )
+    # choose which base link to use based on no_score_limit
+    search_link = UNSCORED_BASE_LINK if no_score_limit else BASE_LINK
+    # if the link can contain NSFW results, we add the blacklist
+    if not is_safe:
+        search_link += "+-" + "+-".join(TAG_BLACKLIST)
+    # and in both cases we add the search cases (obviously)
+    search_link += "+" + "+".join(search_tags)
+
+    r = requests.get(search_link, headers=E621_HEADER, auth=e621_auth,)
     r.raise_for_status()
     result_json = r.text
 
@@ -110,7 +111,7 @@ def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
 def process_comment(comment):
     # constants:
     COMMENT_FOOTER = (
-        "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating. ^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\(safe\), ^^`rating:q` ^^\(questionable\), ^^or ^^`rating:e` ^^\(explicit\)."
+        "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating. ^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\(safe, ^^no ^^blacklist\), ^^`rating:q` ^^\(questionable\), ^^or ^^`rating:e` ^^\(explicit\)."
         "\n"
         "\n"
         "^^I ^^am ^^a ^^bot ^^and ^^a ^^quick ^^and ^^temporary ^^replacement ^^for ^^the ^^real ^^and ^^original ^^furbot. "
@@ -127,6 +128,7 @@ def process_comment(comment):
         "cub",
         "urine",
         "pee",
+        "piss",
         "watersports",
         "child",
         "loli",
@@ -182,9 +184,11 @@ def process_comment(comment):
         comment.reply(message_body)
         print("replied with too many tags")
         return
+
     # cancel search for blacklisted tags
-    # if any search tag is in the blacklist
-    if len(intersection := set(search_tags) & set(TAG_BLACKLIST)) != 0:
+    is_safe = ("rating:s" in search_tags) or ("rating:safe" in search_tags)
+    # (if any search tag is in the blacklist) and (search is not sfw)
+    if (len(intersection := set(search_tags) & set(TAG_BLACKLIST)) != 0) and (not is_safe):
         print("replying...")
         message_body = (
             f"Hello, {comment.author.name}.\n"
@@ -196,7 +200,7 @@ def process_comment(comment):
         )
         add_comment_id(comment.id)
         comment.reply(message_body)
-        print("replied with blacklist")
+        print(f"replied with blacklist at {datetime.now()}")
         return
 
     posts = search(search_tags, TAG_BLACKLIST)
