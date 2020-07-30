@@ -246,7 +246,7 @@ def process_comment(comment):
             )
         else:
             direct_link = f"[Direct Link]({first_post['file']['url']})"
-        link_text = f"[Post]({page_url}) | {direct_link}"
+        link_text = f"[Post]({page_url}) | {direct_link} | Score: {first_post['score']['total']}"
 
     # create the small tag list
     if len(tag_list) == 0:
