@@ -111,10 +111,12 @@ def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
 def process_comment(comment):
     # constants:
     COMMENT_FOOTER = (
-        "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating. ^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\(safe, ^^no ^^blacklist\), ^^`rating:q` ^^\(questionable\), ^^or ^^`rating:e` ^^\(explicit\)."
+        "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating. "
+        "^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\(safe, ^^no ^^blacklist\), ^^`rating:q` ^^\(questionable\), ^^or ^^`rating:e` ^^\(explicit\). "
+        "Results have score limit of 20."
         "\n"
         "\n"
-        "^^I ^^am ^^a ^^bot ^^and ^^a ^^quick ^^and ^^temporary ^^replacement ^^for ^^the ^^real ^^and ^^original ^^furbot. "
+        "^^I ^^am ^^a ^^bot ^^and ^^a ^^replacement ^^for ^^the ^^realer ^^and ^^original ^^furbot. "
         "^^Any ^^comments ^^below ^^0 ^^score ^^will ^^be ^^removed. "
         "^^Please ^^contact ^^\/u\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy ^^or ^^for ^^more ^^information. [^^Source  ^^code.](https://github.com/vaisest/fakeFurBot)\n"
     )
@@ -189,6 +191,7 @@ def process_comment(comment):
     is_safe = ("rating:s" in search_tags) or ("rating:safe" in search_tags)
     # (if any search tag is in the blacklist) and (search is not sfw)
     if (len(intersection := set(search_tags) & set(TAG_BLACKLIST)) != 0) and (not is_safe):
+        # note the pointlessly elegant and cool set intersection and walrus operator
         print("replying...")
         message_body = (
             f"Hello, {comment.author.name}.\n"
@@ -219,7 +222,7 @@ def process_comment(comment):
             link_text = "No results found. You may have an invalid tag, or all possible results had blacklisted tags."
         else:
             link_text = "No results found. All results had a score below 20."
-        tag_list = []
+        post_tag_list = []
     # and if posts were found, process the first one
     else:
         # select first post
@@ -229,7 +232,7 @@ def process_comment(comment):
         page_url = "https://e621.net/posts/" + str(first_post["id"])
 
         # Tags are separated into general species etc so combine them into one.
-        tag_list = (
+        post_tag_list = (
             first_post["tags"]["artist"]
             + first_post["tags"]["copyright"]
             + first_post["tags"]["character"]
@@ -249,18 +252,20 @@ def process_comment(comment):
         link_text = f"[Post]({page_url}) | {direct_link} | Score: {first_post['score']['total']}"
 
     # create the small tag list
-    if len(tag_list) == 0:
+    if len(post_tag_list) == 0:
         tags_message = ""
     else:
         # combine first tag_cutoff amount of tags into the small message and
         # replace "_" and similar characters in the tag list with escaped ones (e.g. "\_") to avoid Reddit's markup
         TAG_CUTOFF = 25
         # clean up tag list from markdown characters
-        tag_list = [tag.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`") for tag in tag_list]
-        tags_message = f"**^^Post ^^Tags:** ^^{' ^^'.join(tag_list[:TAG_CUTOFF])}"
+        post_tag_list = [
+            tag.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`") for tag in post_tag_list
+        ]
+        tags_message = f"**^^Post ^^Tags:** ^^{' ^^'.join(post_tag_list[:TAG_CUTOFF])}"
         # if there are more than 25, add an additional message
-        if len(tag_list) > TAG_CUTOFF:
-            tags_message += f" **^^and ^^{len(tag_list) - TAG_CUTOFF} ^^more ^^tags**"
+        if len(post_tag_list) > TAG_CUTOFF:
+            tags_message += f" **^^and ^^{len(post_tag_list) - TAG_CUTOFF} ^^more ^^tags**"
 
     # compose the final message
     # here we handle a fringe case where the user inputs "furbot search" without any tags and give an explanation for the result
