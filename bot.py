@@ -113,7 +113,7 @@ def process_comment(comment):
     COMMENT_FOOTER = (
         "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating. "
         "^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\(safe, ^^no ^^blacklist\), ^^`rating:q` ^^\(questionable\), ^^or ^^`rating:e` ^^\(explicit\). "
-        "Results have score limit of 20."
+        "^^Results ^^have ^^score ^^limit ^^of ^^20."
         "\n"
         "\n"
         "^^I ^^am ^^a ^^bot ^^and ^^a ^^replacement ^^for ^^the ^^realer ^^and ^^original ^^furbot. "
