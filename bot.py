@@ -49,6 +49,36 @@ E621_HEADER = {"User-Agent": "/r/Furry_irl FakeFurBot by reddit.com/u/heittoaway
 # contains tags that are on the global blacklist
 e621_auth = (file_info[4], file_info[5])
 
+# constants:
+COMMENT_FOOTER = (
+    "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating. "
+    "^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\(safe, ^^no ^^blacklist\), ^^`rating:q` ^^\(questionable\), ^^or ^^`rating:e` ^^\(explicit\). "
+    "^^Results ^^have ^^score ^^limit ^^of ^^20."
+    "\n"
+    "\n"
+    "^^I ^^am ^^a ^^bot ^^and ^^a ^^replacement ^^for ^^the ^^realer ^^and ^^original ^^furbot. "
+    "^^Any ^^comments ^^below ^^0 ^^score ^^will ^^be ^^removed. "
+    "^^Please ^^contact ^^\/u\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy ^^or ^^for ^^more ^^information. [^^Source  ^^code.](https://github.com/vaisest/fakeFurBot)\n"
+)
+TAG_BLACKLIST = [
+    "gore",
+    "castration",
+    "feces",
+    "poop",
+    "scat",
+    "hard_vore",
+    "cub",
+    "urine",
+    "pee",
+    "piss",
+    "watersports",
+    "child",
+    "loli",
+    "shota",
+    "infestation",
+]
+TAG_CUTOFF = 25
+
 
 def deleter_function(deleter_reddit):
     # get an Redditor instance of current user (aka the bot)
@@ -86,6 +116,42 @@ def add_comment_id(id):
         f.write(f"{id}\n")
 
 
+def can_process(comment):
+    # if id is not new (=the bot has replied to it), or the author has the same name as the bot's user, skip it.
+    if check_comment_id(comment.id) or comment.author.name.lower() == bot_username.lower():
+        add_comment_id(comment.id)
+        return False
+    # then check if there's actually a command
+    # this means if all lines DO NOT have the command, skip
+    elif all(["furbot search" not in line.lower() for line in comment.body]):
+        return False
+    else:
+        return True
+
+
+def parse_comment(comment):
+    # remove backslashes, since occasionally they will mess up searches with
+    # escaped underscores: e.g. long\_tag\_thing
+    comment_body = comment.body.replace("\\", "")
+
+    # assign regex_result as None to get around fringe case where the user inputs only furbot search and nothing else
+    regex_result = None
+
+    for line in comment_body:
+        regex = re.search(r"furbot search (.+)", line.lower())
+        # we don't need multiple matches so break out
+        if regex:
+            regex_result = regex.group(1)
+            break
+
+    if regex_result:
+        search_tags = regex_result.split(" ")
+    else:
+        search_tags = []
+
+    return search_tags
+
+
 def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
     BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom+score%3A>19"
     UNSCORED_BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom"
@@ -109,67 +175,12 @@ def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
 
 
 def process_comment(comment):
-    # constants:
-    COMMENT_FOOTER = (
-        "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating. "
-        "^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\(safe, ^^no ^^blacklist\), ^^`rating:q` ^^\(questionable\), ^^or ^^`rating:e` ^^\(explicit\). "
-        "^^Results ^^have ^^score ^^limit ^^of ^^20."
-        "\n"
-        "\n"
-        "^^I ^^am ^^a ^^bot ^^and ^^a ^^replacement ^^for ^^the ^^realer ^^and ^^original ^^furbot. "
-        "^^Any ^^comments ^^below ^^0 ^^score ^^will ^^be ^^removed. "
-        "^^Please ^^contact ^^\/u\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy ^^or ^^for ^^more ^^information. [^^Source  ^^code.](https://github.com/vaisest/fakeFurBot)\n"
-    )
-    TAG_BLACKLIST = [
-        "gore",
-        "castration",
-        "feces",
-        "poop",
-        "scat",
-        "hard_vore",
-        "cub",
-        "urine",
-        "pee",
-        "piss",
-        "watersports",
-        "child",
-        "loli",
-        "shota",
-        "infestation",
-    ]
-    # if id is not new (=the bot has replied to it), or the author has the same name as the bot's user, skip it.
-    if check_comment_id(comment.id) or comment.author.name.lower() == bot_username.lower():
-        add_comment_id(comment.id)
-        return
-
-    # remove backslashes, since occasionally they will mess up searches with
-    # escaped underscores: e.g. long\_tag\_thing
-    comment_body = comment.body.replace("\\", "")
-
-    # take comment text and split into lines
-    text_lines = comment_body.split("\n")
-
-    # then check if there's actually a command
-    # this means if all lines DO NOT have the command, skip.
-    if all(["furbot search" not in line.lower() for line in text_lines]):
+    if not can_process(comment):
         return
 
     print(f"processing #{comment.id}")
-    # assign regex_result as None to get around fringe case where the user inputs only furbot search and nothing else
-    regex_result = None
-    for line in text_lines:
-        # find earlier search command and get the tags
-        regex = re.search(r"furbot search (.+)", line.lower())
-        # we don't need multiple matches so break out
-        if regex:
-            regex_result = regex.group(1)
-            break
 
-    # parse tags into list
-    if regex_result:
-        search_tags = regex_result.split(" ")
-    else:
-        search_tags = []
+    search_tags = parse_comment(comment)
 
     # prevent bot abuse with too many tags
     if len(search_tags) >= 20:
@@ -189,9 +200,9 @@ def process_comment(comment):
 
     # cancel search for blacklisted tags
     is_safe = ("rating:s" in search_tags) or ("rating:safe" in search_tags)
-    # (if any search tag is in the blacklist) and (search is not sfw)
+    # below means (if any search tag is in the blacklist) and (search is not sfw)
     if (len(intersection := set(search_tags) & set(TAG_BLACKLIST)) != 0) and (not is_safe):
-        # note the pointlessly elegant and cool set intersection and walrus operator
+        # note the pointlessly elegant and cool set intersection and walrus operator. Python 3.8 truly necessary
         print("replying...")
         message_body = (
             f"Hello, {comment.author.name}.\n"
@@ -223,15 +234,14 @@ def process_comment(comment):
         else:
             link_text = "No results found. All results had a score below 20."
         post_tag_list = []
-    # and if posts were found, process the first one
     else:
-        # select first post
         first_post = posts[0]
 
         # Find url of first post. Oddly everything else has a cool direct link into it, but the json only supplies the id of the post and not the link.
         page_url = "https://e621.net/posts/" + str(first_post["id"])
 
         # Tags are separated into general species etc so combine them into one.
+        # TODO: more useful order?
         post_tag_list = (
             first_post["tags"]["artist"]
             + first_post["tags"]["copyright"]
@@ -244,9 +254,7 @@ def process_comment(comment):
 
         # Check for swf/flash first before setting direct link to full image.
         if first_post["file"]["ext"] == "swf":
-            direct_link = (
-                "Direct links do not work properly with flash animations. Please check the post."
-            )
+            direct_link = "Flash animation. Check post."
         else:
             direct_link = f"[Direct Link]({first_post['file']['url']})"
         link_text = f"[Post]({page_url}) | {direct_link} | Score: {first_post['score']['total']}"
@@ -255,15 +263,12 @@ def process_comment(comment):
     if len(post_tag_list) == 0:
         tags_message = ""
     else:
-        # combine first tag_cutoff amount of tags into the small message and
-        # replace "_" and similar characters in the tag list with escaped ones (e.g. "\_") to avoid Reddit's markup
-        TAG_CUTOFF = 25
-        # clean up tag list from markdown characters
+        # clean up tag list from any markdown characters
         post_tag_list = [
             tag.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`") for tag in post_tag_list
         ]
         tags_message = f"**^^Post ^^Tags:** ^^{' ^^'.join(post_tag_list[:TAG_CUTOFF])}"
-        # if there are more than 25, add an additional message
+        # if there are more than 25, add an additional message, replacing the rest
         if len(post_tag_list) > TAG_CUTOFF:
             tags_message += f" **^^and ^^{len(post_tag_list) - TAG_CUTOFF} ^^more ^^tags**"
 
@@ -275,6 +280,7 @@ def process_comment(comment):
         explanation_text = "Here are the results for your search:"
 
     # fix underscores etc markdown formatting characters from search_tags
+    # since we're putting them in the reply
     search_tags = [
         tag.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`") for tag in search_tags
     ]
@@ -297,16 +303,12 @@ def process_comment(comment):
     add_comment_id(comment.id)
     print(f"succesfully replied at {datetime.now()}")
 
-    # this makes the bot wait after handling a new comment
-    # it should slow down any loops and nicely prevents the bot from exceeding e621's request limit rate
-    # it nicely also only works if a match was found so the bot **shouldn't** get stuck on other comments
-    time.sleep(5)
-
 
 def wrapper():
     # start listening for new comments
     for comment in subreddit.stream.comments():
         process_comment(comment)
+        time.sleep(5)
 
 
 # launch comment deleter in its own thread and pass its Reddit instance to it
