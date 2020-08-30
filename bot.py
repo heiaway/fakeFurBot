@@ -123,7 +123,7 @@ def can_process(comment):
         return False
     # then check if there's actually a command
     # this means if all lines DO NOT have the command, skip
-    elif all(["furbot search" not in line.lower() for line in comment.body]):
+    elif all(["furbot search" not in line.lower() for line in comment.body.splitlines()]):
         return False
     else:
         return True
@@ -137,7 +137,7 @@ def parse_comment(comment):
     # assign regex_result as None to get around fringe case where the user inputs only furbot search and nothing else
     regex_result = None
 
-    for line in comment_body:
+    for line in comment_body.splitlines():
         regex = re.search(r"furbot search (.+)", line.lower())
         # we don't need multiple matches so break out
         if regex:
@@ -302,13 +302,13 @@ def process_comment(comment):
     comment.reply(message_body)
     add_comment_id(comment.id)
     print(f"succesfully replied at {datetime.now()}")
+    time.sleep(5)
 
 
 def wrapper():
     # start listening for new comments
     for comment in subreddit.stream.comments():
         process_comment(comment)
-        time.sleep(5)
 
 
 # launch comment deleter in its own thread and pass its Reddit instance to it
