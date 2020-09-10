@@ -219,7 +219,7 @@ def process_comment(comment):
 
     posts = search(search_tags, TAG_BLACKLIST)
 
-    # create the Post | Direct link text
+    # create the Post | Direct link text and save tags
     # if no posts were found, search again to make error message more specific
     if len(posts) == 0:
         # test if score was the problem by requesting another list from the site,
@@ -247,8 +247,8 @@ def process_comment(comment):
             + first_post["tags"]["copyright"]
             + first_post["tags"]["character"]
             + first_post["tags"]["species"]
-            + first_post["tags"]["general"]
             + first_post["tags"]["lore"]
+            + first_post["tags"]["general"]
             + first_post["tags"]["meta"]
         )
 
