@@ -76,6 +76,8 @@ TAG_BLACKLIST = [
     "loli",
     "shota",
     "infestation",
+    "necrophilia",
+    "death",
 ]
 TAG_CUTOFF = 25
 
