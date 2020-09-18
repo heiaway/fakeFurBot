@@ -85,25 +85,27 @@ TAG_CUTOFF = 25
 def deleter_function(deleter_reddit):
     # get an Redditor instance of current user (aka the bot)
     user = deleter_reddit.user.me()
-    try:
-        print(f"DELETER: Starting deleter at {datetime.now()}")
-        while True:
-            # the first 200 comments ought to be enough, and should
-            # limit the amount of time spent on this simple task
-            comments = user.comments.new(limit=200)
-            for comment in comments:
-                if comment.score < 0:
-                    print(
-                        f"DELETER: Removing comment #{comment.id} at {datetime.now()} due to its low score ({comment.score})."
-                    )
-                    print(f"'{comment.body}'")
-                    comment.delete()
-            # check every ~10 minutes
-            time.sleep(600)
-    except Exception as e:
-        logging.exception("DELETER: Caught an unknown exception.")
-        logging.info("DELETER: Waiting for 300 seconds before resuming")
-        time.sleep(300)
+    # thanks PRAW:
+    while True:
+        try:
+            print(f"DELETER: Starting deleter at {datetime.now()}")
+            while True:
+                # the first 200 comments ought to be enough, and should
+                # limit the amount of time spent on this simple task
+                comments = user.comments.new(limit=200)
+                for comment in comments:
+                    if comment.score < 0:
+                        print(
+                            f"DELETER: Removing comment #{comment.id} at {datetime.now()} due to its low score ({comment.score})."
+                        )
+                        print(f"'{comment.body}'")
+                        comment.delete()
+                # check every ~10 minutes
+                time.sleep(600)
+        except Exception:
+            logging.exception("DELETER: Caught an unknown exception.")
+            logging.info("DELETER: Waiting for 300 seconds before resuming")
+            time.sleep(300)
 
 
 def check_comment_id(id):
