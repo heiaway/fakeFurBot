@@ -20,7 +20,6 @@ with open("login.txt", "r") as f:
     file_info = [x.strip() for x in file_info]
 
 
-# log in to reddit and set subreddit
 bot_reddit = praw.Reddit(
     client_id=file_info[0],
     client_secret=file_info[1],
@@ -44,7 +43,7 @@ bot_username = file_info[3]
 # requests user agent header
 E621_HEADER = {"User-Agent": "/r/Furry_irl FakeFurBot by reddit.com/u/heittoaway"}
 
-# we have must log in to e621 since otherwise
+# we have to log in to e621 since otherwise
 # the API will give "null" on any post's url that
 # contains tags that are on the global blacklist
 e621_auth = (file_info[4], file_info[5])
@@ -60,6 +59,7 @@ COMMENT_FOOTER = (
     "^^Any ^^comments ^^below ^^0 ^^score ^^will ^^be ^^removed. "
     "^^Please ^^contact ^^\/u\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy ^^or ^^for ^^more ^^information. [^^Source  ^^code.](https://github.com/vaisest/fakeFurBot)\n"
 )
+# TODO: add aliases for these dirty tags
 TAG_BLACKLIST = [
     "gore",
     "castration",
@@ -83,9 +83,8 @@ TAG_CUTOFF = 25
 
 
 def deleter_function(deleter_reddit):
-    # get an Redditor instance of current user (aka the bot)
     user = deleter_reddit.user.me()
-    # thanks PRAW:
+    # as usual the PRAW stream error problem needs a loop:
     while True:
         try:
             print(f"DELETER: Starting deleter at {datetime.now()}")
@@ -121,7 +120,7 @@ def add_comment_id(id):
 
 
 def can_process(comment):
-    # if id is not new (=the bot has replied to it), or the author has the same name as the bot's user, skip it.
+    # if id is not new (i.e. the bot has replied to it), or the author has the same name as the bot's user, skip it.
     if check_comment_id(comment.id) or comment.author.name.lower() == bot_username.lower():
         add_comment_id(comment.id)
         return False
@@ -135,7 +134,7 @@ def can_process(comment):
 
 def parse_comment(comment):
     # remove backslashes, since occasionally they will mess up searches with
-    # escaped underscores: e.g. long\_tag\_thing
+    # escaped underscores: e.g. long\_tag\_thing to avoid italics
     comment_body = comment.body.replace("\\", "")
 
     # assign regex_result as None to get around fringe case where the user inputs only furbot search and nothing else
@@ -206,7 +205,7 @@ def process_comment(comment):
     is_safe = ("rating:s" in search_tags) or ("rating:safe" in search_tags)
     # below means (if any search tag is in the blacklist) and (search is not sfw)
     if (len(intersection := set(search_tags) & set(TAG_BLACKLIST)) != 0) and (not is_safe):
-        # note the pointlessly elegant and cool set intersection and walrus operator. Python 3.8 truly necessary
+        # note the pointlessly elegant and cool set intersection and walrus operator. Python 3.8 absolutely necessary
         print("replying...")
         message_body = (
             f"Hello, {comment.author.name}.\n"
@@ -223,7 +222,6 @@ def process_comment(comment):
 
     posts = search(search_tags, TAG_BLACKLIST)
 
-    # create the Post | Direct link text and save tags
     # if no posts were found, search again to make error message more specific
     if len(posts) == 0:
         # test if score was the problem by requesting another list from the site,
@@ -238,6 +236,7 @@ def process_comment(comment):
         else:
             link_text = "No results found. All results had a score below 20."
         post_tag_list = []
+    # create the Post | Direct link text and save tags
     else:
         first_post = posts[0]
 
@@ -276,14 +275,15 @@ def process_comment(comment):
         if len(post_tag_list) > TAG_CUTOFF:
             tags_message += f" **^^and ^^{len(post_tag_list) - TAG_CUTOFF} ^^more ^^tags**"
 
-    # compose the final message
-    # here we handle a fringe case where the user inputs "furbot search" without any tags and give an explanation for the result
+    # next start composing the final message
+    # here we handle a fringe case where the user inputs "furbot search"
+    # without any tags and give an explanation for the result
     if len(search_tags) == 0:
         explanation_text = "It seems that you did not input any tags in your search. Anyway, here is a random result from e621:"
     else:
         explanation_text = "Here are the results for your search:"
 
-    # fix underscores etc markdown formatting characters from search_tags
+    # escape underscores etc markdown formatting characters from search_tags
     # since we're putting them in the reply
     search_tags = [
         tag.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`") for tag in search_tags
