@@ -59,26 +59,12 @@ COMMENT_FOOTER = (
     "^^Any ^^comments ^^below ^^0 ^^score ^^will ^^be ^^removed. "
     "^^Please ^^contact ^^\/u\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy ^^or ^^for ^^more ^^information. [^^Source  ^^code.](https://github.com/vaisest/fakeFurBot)\n"
 )
-# TODO: add aliases for these dirty tags
-TAG_BLACKLIST = [
-    "gore",
-    "castration",
-    "feces",
-    "poop",
-    "scat",
-    "hard_vore",
-    "cub",
-    "urine",
-    "pee",
-    "piss",
-    "watersports",
-    "child",
-    "loli",
-    "shota",
-    "infestation",
-    "necrophilia",
-    "death",
-]
+
+print("Reading blacklisted tags from generated_blacklist.txt")
+with open("generated_blacklist.txt", "r") as f:
+    TAG_BLACKLIST = f.read().split("\n")
+
+
 TAG_CUTOFF = 25
 
 
@@ -320,14 +306,14 @@ print("Creating and starting deleter_thread")
 deleter_thread = threading.Thread(target=deleter_function, args=(deleter_reddit,), daemon=True)
 deleter_thread.start()
 
-print("Bot started")
+
 # since PRAW doesn't handle the usual 503 errors caused by reddit's awful servers,
 # they have to be handled manually. Additionally, whenever an error is raised, the
 # stream stops, so we need this ugly wrapper:
 # This might have been changed in a recent PRAW update, but I'm not exactly sure if it works so this can stay
 while True:
     try:
-        print(f"Starting at {datetime.now()}")
+        print(f"Starting bot at {datetime.now()}")
         wrapper()
     except praw.exceptions.RedditAPIException:
         logging.exception("Caught a Reddit API error.")
