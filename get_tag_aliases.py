@@ -51,7 +51,7 @@ for tag in base_tags:
         full_tag_list.append(first_js[0]["consequent_name"])
     print("Waiting 2 seconds")
     time.sleep(2)
-
+print(f"{full_tag_list=}")
 print("Writing tags to generated_blacklist.txt")
-with open("generated_blacklist.txt", "w") as f:
+with open("generated_blacklist.txt", "w", encoding="UTF-8") as f:
     f.write("\n".join(full_tag_list))
