@@ -62,6 +62,10 @@ COMMENT_FOOTER = (
 
 print("Reading blacklisted tags from generated_blacklist.txt")
 with open("generated_blacklist.txt", "r") as f:
+    ALIASED_TAG_BLACKLIST = f.read().split("\n")
+# this is due to e621 having a 40 tag limit, so we can't use all blacklisted tag aliases
+print("Reading base blacklist from blacklist.txt")
+with open("blacklist.txt", "r") as f:
     TAG_BLACKLIST = f.read().split("\n")
 
 
@@ -172,12 +176,15 @@ def process_comment(comment):
     search_tags = parse_comment(comment)
 
     # prevent bot abuse with too many tags
-    if len(search_tags) >= 20:
+    is_safe = ("rating:s" in search_tags) or ("rating:safe" in search_tags)
+    if (not is_safe and (len(search_tags) + len(TAG_BLACKLIST) >= 40)) or (
+        is_safe and len(search_tags) > 40
+    ):
         print("replying...")
         message_body = (
             f"Hello, {comment.author.name}.\n"
             "\n"
-            f"There are more than 20 tags. Please try searching with fewer tags.\n"
+            f"There are more than {40-len(TAG_BLACKLIST) if not is_safe else 40} tags. Please try searching with fewer tags.\n"
             "\n"
             "---\n"
             "\n" + COMMENT_FOOTER
@@ -188,9 +195,8 @@ def process_comment(comment):
         return
 
     # cancel search for blacklisted tags
-    is_safe = ("rating:s" in search_tags) or ("rating:safe" in search_tags)
     # below means (if any search tag is in the blacklist) and (search is not sfw)
-    if (len(intersection := set(search_tags) & set(TAG_BLACKLIST)) != 0) and (not is_safe):
+    if (len(intersection := set(search_tags) & set(ALIASED_TAG_BLACKLIST)) != 0) and (not is_safe):
         # note the pointlessly elegant and cool set intersection and walrus operator. Python 3.8 absolutely necessary
         print("replying...")
         message_body = (
