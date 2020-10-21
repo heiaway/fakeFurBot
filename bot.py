@@ -57,7 +57,7 @@ COMMENT_FOOTER = (
     "\n"
     "^^I ^^am ^^a ^^bot ^^and ^^a ^^replacement ^^for ^^the ^^realer ^^and ^^original ^^furbot. "
     "^^Any ^^comments ^^below ^^0 ^^score ^^will ^^be ^^removed. "
-    "^^Please ^^contact ^^\/u\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy ^^or ^^for ^^more ^^information. [^^Source  ^^code.](https://github.com/vaisest/fakeFurBot)\n"
+    "^^Please ^^contact ^^\/u\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy, ^^to ^^request ^^features, ^^or ^^for ^^any ^^other ^^reasons. [^^Source  ^^code.](https://github.com/vaisest/fakeFurBot)\n"
 )
 
 print("Reading blacklisted tags from generated_blacklist.txt")
