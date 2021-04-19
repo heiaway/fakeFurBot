@@ -4,6 +4,7 @@ import logging
 import re
 import threading
 import time
+from collections import defaultdict
 from datetime import datetime
 
 import praw
@@ -68,7 +69,17 @@ print("Reading base blacklist from blacklist.txt")
 with open("blacklist.txt", "r") as f:
     TAG_BLACKLIST = f.read().split("\n")
 
+# tag implication list
+print("Reading tag implications list from implicated_tags.txt")
+with open("implicated_tags.txt", "r") as f:
+    TAG_IMPLICATIONS = defaultdict(list)
+    for item in f.read().split("\n"):
+        if item == "":
+            break
+        original, implied = item.split("%")
+        TAG_IMPLICATIONS[original] += [implied]
 
+# how many tags are put in the comment
 TAG_CUTOFF = 25
 
 
@@ -145,6 +156,17 @@ def parse_comment(comment):
     return search_tags
 
 
+def remove_implicated_tags(original_tags):
+    original_tags = set(original_tags)
+    most_likely_unnecessary_tags = set()
+
+    for tag in original_tags:
+        if tag in TAG_IMPLICATIONS:
+            most_likely_unnecessary_tags.update(TAG_IMPLICATIONS[tag])
+
+    return sorted(original_tags - most_likely_unnecessary_tags), len(most_likely_unnecessary_tags)
+
+
 def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
     BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom+score%3A>19"
     UNSCORED_BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom"
@@ -159,7 +181,11 @@ def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
     # and in both cases we add the search cases (obviously)
     search_link += "+" + "+".join(search_tags)
 
-    r = requests.get(search_link, headers=E621_HEADER, auth=e621_auth,)
+    r = requests.get(
+        search_link,
+        headers=E621_HEADER,
+        auth=e621_auth,
+    )
     r.raise_for_status()
     result_json = r.text
 
@@ -235,21 +261,23 @@ def process_comment(comment):
         # Find url of first post. Oddly everything else has a cool direct link into it, but the json only supplies the id of the post and not the link.
         page_url = "https://e621.net/posts/" + str(first_post["id"])
 
-        # Tags are separated into general species etc so combine them into one.
-        # TODO: more useful order?
-        post_tag_list = (
-            first_post["tags"]["artist"]
-            + first_post["tags"]["copyright"]
-            + first_post["tags"]["character"]
-            + first_post["tags"]["species"]
-            + first_post["tags"]["lore"]
-            + first_post["tags"]["general"]
-            + first_post["tags"]["meta"]
-        )
+        # Tags are separated into general species etc so combine them into one
+        # TODO: even more useful order?
+
+        # fix tags a bit by removing implicated tags.
+        # So e.g. bird implicates avian, and we probably know
+        # a bird is an avian and don't need *really* the avian tag.
+        removed_tags_count = 0
+        post_tag_list = []
+
+        for category in ["artist", "copyright", "character", "species", "lore", "general", "meta"]:
+            result, count = remove_implicated_tags(first_post["tags"][category])
+            post_tag_list += result
+            removed_tags_count += count
 
         # Check for swf/flash first before setting direct link to full image.
         if first_post["file"]["ext"] == "swf":
-            direct_link = "Flash animation. Check post."
+            direct_link = "Flash animation. Check the post."
         else:
             direct_link = f"[Direct Link]({first_post['file']['url']})"
         link_text = f"[Post]({page_url}) | {direct_link} | Score: {first_post['score']['total']}"
@@ -265,7 +293,11 @@ def process_comment(comment):
         tags_message = f"**^^Post ^^Tags:** ^^{' ^^'.join(post_tag_list[:TAG_CUTOFF])}"
         # if there are more than 25, add an additional message, replacing the rest
         if len(post_tag_list) > TAG_CUTOFF:
-            tags_message += f" **^^and ^^{len(post_tag_list) - TAG_CUTOFF} ^^more ^^tags**"
+            tags_message += (
+                f" **^^and ^^{len(post_tag_list) - TAG_CUTOFF + removed_tags_count} ^^more ^^tags**"
+            )
+        elif removed_tags_count > 0:
+            tags_message += f" **^^and ^^{len(post_tag_list) + removed_tags_count} ^^more ^^tags**"
 
     # next start composing the final message
     # here we handle a fringe case where the user inputs "furbot search"

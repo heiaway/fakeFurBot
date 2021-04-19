@@ -1,7 +1,7 @@
 import json
-import requests
 import time
 
+import requests
 
 # requests user agent header
 E621_HEADER = {"User-Agent": "/r/Furry_irl FakeFurBot by reddit.com/u/heittoaway"}
@@ -32,8 +32,8 @@ for tag in base_tags:
     if not isinstance(first_js, list):
         # so no aliases => add only tag
         full_tag_list.append(tag)
-        print("Waiting 2 seconds")
-        time.sleep(2)
+        print("Waiting a second")
+        time.sleep(1)
         continue
     # this means that the tag we are searching IS an alias, so search
     # again for the base tag and aliases
@@ -41,8 +41,8 @@ for tag in base_tags:
         js = get_aliases(first_js[0]["consequent_name"])
         full_tag_list += [x["antecedent_name"] for x in js]
         full_tag_list.append(js[0]["consequent_name"])
-        print("Waiting 2 seconds")
-        time.sleep(2)
+        print("Waiting a second")
+        time.sleep(1)
         continue
     # if there are many tags, then we searched the base tag
     # so add all aliases, and the tag:

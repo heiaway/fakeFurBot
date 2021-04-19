@@ -1,5 +1,7 @@
 
 login.txt
 login - Copy.txt
-.vscode/settings.json
+.vscode/
 generated_blacklist.txt
+implicated_species_tags.txt
+venv/
