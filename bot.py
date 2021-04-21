@@ -158,13 +158,13 @@ def parse_comment(comment):
 
 def remove_implicated_tags(original_tags):
     original_tags = set(original_tags)
-    most_likely_unnecessary_tags = set()
+    unnecessary_tags = set()
 
     for tag in original_tags:
         if tag in TAG_IMPLICATIONS:
-            most_likely_unnecessary_tags.update(TAG_IMPLICATIONS[tag])
+            unnecessary_tags.update(TAG_IMPLICATIONS[tag])
 
-    return sorted(original_tags - most_likely_unnecessary_tags), len(most_likely_unnecessary_tags)
+    return sorted(original_tags - unnecessary_tags), len(original_tags & unnecessary_tags)
 
 
 def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
@@ -223,7 +223,6 @@ def process_comment(comment):
     # cancel search for blacklisted tags
     # below means (if any search tag is in the blacklist) and (search is not sfw)
     if (len(intersection := set(search_tags) & set(ALIASED_TAG_BLACKLIST)) != 0) and (not is_safe):
-        # note the pointlessly elegant and cool set intersection and walrus operator. Python 3.8 absolutely necessary
         print("replying...")
         message_body = (
             f"Hello, {comment.author.name}.\n"
@@ -297,7 +296,7 @@ def process_comment(comment):
                 f" **^^and ^^{len(post_tag_list) - TAG_CUTOFF + removed_tags_count} ^^more ^^tags**"
             )
         elif removed_tags_count > 0:
-            tags_message += f" **^^and ^^{len(post_tag_list) + removed_tags_count} ^^more ^^tags**"
+            tags_message += f" **^^and ^^{removed_tags_count} ^^more ^^tags**"
 
     # next start composing the final message
     # here we handle a fringe case where the user inputs "furbot search"
