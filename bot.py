@@ -127,10 +127,9 @@ def can_process(comment):
         return False
     # then check if there's actually a command
     # this means if all lines DO NOT have the command, skip
-    elif all(["furbot search" not in line.lower() for line in comment.body.splitlines()]):
+    if all("furbot search" not in line.lower() for line in comment.body.splitlines()):
         return False
-    else:
-        return True
+    return True
 
 
 def parse_comment(comment):
@@ -261,7 +260,6 @@ def process_comment(comment):
         page_url = "https://e621.net/posts/" + str(first_post["id"])
 
         # Tags are separated into general species etc so combine them into one
-        # TODO: even more useful order?
 
         # fix tags a bit by removing implicated tags.
         # So e.g. bird implicates avian, and we probably know
