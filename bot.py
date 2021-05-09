@@ -13,33 +13,26 @@ import requests
 # this is so we can handle the 503 errors caused by Reddit's servers being awful
 from prawcore.exceptions import ServerError
 
-# open file in current working directory, so hopefully the same as the script's directory
-with open("login.txt", "r") as f:
-    # file format is: client_id,client_secret,password,username,e621_username,e621_key
-    file_info = f.read().split(",")
-    # strip spaces just to be sure
-    file_info = [x.strip() for x in file_info]
+# load variables: client_id,client_secret,password,username,e621_username,e621_key
+# config.py is just python code like `client_id = "abc123"`
+import config
 
 
-bot_reddit = praw.Reddit(
-    client_id=file_info[0],
-    client_secret=file_info[1],
-    password=file_info[2],
-    user_agent="/r/Furry_irl bot by /u/heittoaway",
-    username=file_info[3],
-)
+def authenticate_reddit():
+    return praw.Reddit(
+        client_id=config.client_id,
+        client_secret=config.client_secret,
+        username=config.reddit_user,
+        password=config.reddit_pass,
+        user_agent="/r/Furry_irl bot by /u/heittoaway",
+    )
+
+
+bot_reddit = authenticate_reddit()
 subreddit = bot_reddit.subreddit("furry_irl")
 
-deleter_reddit = praw.Reddit(
-    client_id=file_info[0],
-    client_secret=file_info[1],
-    password=file_info[2],
-    user_agent="/r/Furry_irl bot by /u/heittoaway",
-    username=file_info[3],
-)
-
 # change the name to be clearer since the bot's name will be used later
-bot_username = file_info[3]
+# bot_username = file_info[3]
 
 # requests user agent header
 E621_HEADER = {"User-Agent": "/r/Furry_irl FakeFurBot by reddit.com/u/heittoaway"}
@@ -47,7 +40,7 @@ E621_HEADER = {"User-Agent": "/r/Furry_irl FakeFurBot by reddit.com/u/heittoaway
 # we have to log in to e621 since otherwise
 # the API will give "null" on any post's url that
 # contains tags that are on the global blacklist
-e621_auth = (file_info[4], file_info[5])
+e621_auth = (config.e621_user, config.e621_pass)
 
 # constants:
 COMMENT_FOOTER = (
@@ -122,7 +115,7 @@ def add_comment_id(id):
 
 def can_process(comment):
     # if id is not new (i.e. the bot has replied to it), or the author has the same name as the bot's user, skip it.
-    if check_comment_id(comment.id) or comment.author.name.lower() == bot_username.lower():
+    if check_comment_id(comment.id) or comment.author.name.lower() == config.reddit_user.lower():
         add_comment_id(comment.id)
         return False
     # then check if there's actually a command
@@ -338,6 +331,7 @@ def wrapper():
 
 # launch comment deleter in its own thread and pass its Reddit instance to it
 print("Creating and starting deleter_thread")
+deleter_reddit = authenticate_reddit()
 deleter_thread = threading.Thread(target=deleter_function, args=(deleter_reddit,), daemon=True)
 deleter_thread.start()
 
