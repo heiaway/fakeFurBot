@@ -19,6 +19,8 @@ import config
 
 
 def authenticate_reddit():
+    """Authenticate on reddit and return a new PRAW Reddit instance."""
+
     return praw.Reddit(
         client_id=config.client_id,
         client_secret=config.client_secret,
@@ -77,6 +79,8 @@ TAG_CUTOFF = 25
 
 
 def deleter_function(deleter_reddit):
+    """Function that deletes the bot's comments below 0 score on a 10 minute loop."""
+
     user = deleter_reddit.user.me()
     # as usual the PRAW stream error problem needs a loop:
     while True:
@@ -102,19 +106,34 @@ def deleter_function(deleter_reddit):
 
 
 def check_comment_id(id):
-    # opens id file "comment_ids.txt" and returns True if supplied id is in the file
+    """
+    Checks the file comment_ids.txt in current working directory and
+    returns True if the id is in the file.
+    Used to check for already processed comments.
+    """
+
     with open("comment_ids.txt", "r") as f:
         id_list = f.read().split("\n")
         return id in id_list
 
 
 def add_comment_id(id):
+    """
+    Adds a comment id to comment_ids.txt in the current working directory
+    to signify that the comment has already been processed.
+    """
+
     with open("comment_ids.txt", "a") as f:
         f.write(f"{id}\n")
 
 
 def can_process(comment):
-    # if id is not new (i.e. the bot has replied to it), or the author has the same name as the bot's user, skip it.
+    """
+    Checks if the comment can be processed via check_comment_id()
+    and makes sure the bot doesn't reply to its own comments.
+    Then it checks for a \"furbot search ??\" command.
+    """
+
     if check_comment_id(comment.id) or comment.author.name.lower() == config.reddit_user.lower():
         add_comment_id(comment.id)
         return False
@@ -126,8 +145,12 @@ def can_process(comment):
 
 
 def parse_comment(comment):
-    # remove backslashes, since occasionally they will mess up searches with
-    # escaped underscores: e.g. long\_tag\_thing to avoid italics
+    """
+    Parses the \"furbot search\" command from the comment while
+    removing escaped backslashes, which commonly mess up searches.
+    Returns the search tags in a list of strings.
+    """
+
     comment_body = comment.body.replace("\\", "")
 
     # assign regex_result as None to get around fringe case where the user inputs only furbot search and nothing else
@@ -149,6 +172,12 @@ def parse_comment(comment):
 
 
 def remove_implicated_tags(original_tags):
+    """
+    E621 includes implicated tags (e.g. cat implies feline) in the tags
+    and they are unnecessary. This function uses the tag implications from the
+    implicated_tags.txt file to remove them so that only the most specific tag remains.
+    """
+
     original_tags = set(original_tags)
     unnecessary_tags = set()
 
@@ -160,6 +189,12 @@ def remove_implicated_tags(original_tags):
 
 
 def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
+    """
+    Performs a search on e621 and returns the posts in a list of dicts.
+    Applies a blacklist if the search is determined to be NSFW.
+    no_score_limit can remove the score limit from the search.
+    """
+
     BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom+score%3A>19"
     UNSCORED_BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom"
     # determine if the search is guaranteed to be sfw or not
@@ -167,7 +202,7 @@ def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
 
     # choose which base link to use based on no_score_limit
     search_link = UNSCORED_BASE_LINK if no_score_limit else BASE_LINK
-    # if the link can contain NSFW results, we add the blacklist
+
     if not is_safe:
         search_link += "+-" + "+-".join(TAG_BLACKLIST)
     # and in both cases we add the search cases (obviously)
@@ -186,6 +221,16 @@ def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
 
 
 def process_comment(comment):
+    """
+    The actual processing of the bot.
+    It will check if it can process the comment, parses tags from it and searches.
+    If the comment contains blacklisted tags or too many tags it will answer accordingly.
+    If posts were found the bot will make sure that it wasn't because of the score limit
+    and if it was it will explain it.
+
+    The result will contain an explanation text, links to the post and a direct link to the image/video,
+    a small list of the tags, and a footer explaining some things.
+    """
     if not can_process(comment):
         return
 
@@ -324,7 +369,13 @@ def process_comment(comment):
 
 
 def wrapper():
-    # start listening for new comments
+    """
+    Wrapper that checks a stream and calls process_comment on them.
+    Only necessary because PRAW likes to sometimes throw exceptions
+    when Reddit's servers are broken (which happens ridiculously often)
+    instead of trying again.
+    """
+
     for comment in subreddit.stream.comments():
         process_comment(comment)
 
@@ -338,8 +389,8 @@ deleter_thread.start()
 
 # since PRAW doesn't handle the usual 503 errors caused by reddit's awful servers,
 # they have to be handled manually. Additionally, whenever an error is raised, the
-# stream stops, so we need this ugly wrapper:
-# This might have been changed in a recent PRAW update, but I'm not exactly sure if it works so this can stay
+# stream stops, so we need an ugly wrapper:
+# This might have been changed in a PRAW update, but I'm not exactly sure if it works so this can stay
 while True:
     try:
         print(f"Starting bot at {datetime.now()}")
