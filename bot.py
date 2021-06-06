@@ -157,10 +157,11 @@ def parse_comment(comment):
     regex_result = None
 
     for line in comment_body.splitlines():
-        regex = re.search(r"furbot search (.+)", line.lower())
-        # we don't need multiple matches so break out
-        if regex:
+        # matches furbot search (tag1 tag2), at the start of a line,
+        # with an optional u/ or /u/ at the start
+        if regex := re.search(r"^\s*\/?(?:u\/)?furbot search (.+)", line.lower()):
             regex_result = regex.group(1)
+            # we don't want multiple matches so break out
             break
 
     if regex_result:
