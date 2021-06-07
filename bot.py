@@ -1,5 +1,4 @@
 #!/usr/bin/env python3.8
-import json
 import logging
 import re
 import threading
@@ -16,6 +15,8 @@ from prawcore.exceptions import ServerError
 # load variables: client_id,client_secret,password,username,e621_username,e621_key
 # config.py is just python code like `client_id = "abc123"`
 import config
+import deleter
+import e621
 
 
 def authenticate_reddit():
@@ -42,9 +43,36 @@ E621_HEADER = {"User-Agent": "/r/Furry_irl FakeFurBot by reddit.com/u/heittoaway
 # we have to log in to e621 since otherwise
 # the API will give "null" on any post's url that
 # contains tags that are on the global blacklist
-e621_auth = (config.e621_user, config.e621_pass)
+E621_AUTH = (config.e621_user, config.e621_pass)
 
-# constants:
+
+# load constants:
+print("Reading blacklisted tags from generated_blacklist.txt")
+try:
+    with open("generated_blacklist.txt", "r") as f:
+        ALIASED_TAG_BLACKLIST = f.read().split("\n")
+    # this is due to e621 having a 40 tag limit, so we can't use all blacklisted tag aliases
+    print("Reading base blacklist from blacklist.txt")
+    with open("blacklist.txt", "r") as f:
+        TAG_BLACKLIST = f.read().split("\n")
+
+    # tag implication list
+    print("Reading tag implications list from implicated_tags.txt")
+    with open("implicated_tags.txt", "r") as f:
+        TAG_IMPLICATIONS = defaultdict(list)
+        for item in f.read().split("\n"):
+            if item == "":
+                break
+            original, implied = item.split("%")
+            TAG_IMPLICATIONS[original] += [implied]
+except OSError:
+    logging.exception(
+        "Failed to open tag lists generated_blacklist.txt, blacklist.txt, and implicated_tags.txt"
+    )
+
+# how many tags are put in the comment
+TAG_CUTOFF = 25
+
 COMMENT_FOOTER = (
     "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating. "
     "^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\(safe, ^^no ^^blacklist\), ^^`rating:q` ^^\(questionable\), ^^or ^^`rating:e` ^^\(explicit\). "
@@ -55,54 +83,6 @@ COMMENT_FOOTER = (
     "^^Any ^^comments ^^below ^^0 ^^score ^^will ^^be ^^removed. "
     "^^Please ^^contact ^^\/u\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy, ^^to ^^request ^^features, ^^or ^^for ^^any ^^other ^^reasons. [^^Source  ^^code.](https://github.com/vaisest/fakeFurBot)\n"
 )
-
-print("Reading blacklisted tags from generated_blacklist.txt")
-with open("generated_blacklist.txt", "r") as f:
-    ALIASED_TAG_BLACKLIST = f.read().split("\n")
-# this is due to e621 having a 40 tag limit, so we can't use all blacklisted tag aliases
-print("Reading base blacklist from blacklist.txt")
-with open("blacklist.txt", "r") as f:
-    TAG_BLACKLIST = f.read().split("\n")
-
-# tag implication list
-print("Reading tag implications list from implicated_tags.txt")
-with open("implicated_tags.txt", "r") as f:
-    TAG_IMPLICATIONS = defaultdict(list)
-    for item in f.read().split("\n"):
-        if item == "":
-            break
-        original, implied = item.split("%")
-        TAG_IMPLICATIONS[original] += [implied]
-
-# how many tags are put in the comment
-TAG_CUTOFF = 25
-
-
-def deleter_function(deleter_reddit):
-    """Function that deletes the bot's comments below 0 score on a 10 minute loop."""
-
-    user = deleter_reddit.user.me()
-    # as usual the PRAW stream error problem needs a loop:
-    while True:
-        try:
-            print(f"DELETER: Starting deleter at {datetime.now()}")
-            while True:
-                # the first 200 comments ought to be enough, and should
-                # limit the amount of time spent on this simple task
-                comments = user.comments.new(limit=200)
-                for comment in comments:
-                    if comment.score < 0:
-                        print(
-                            f"DELETER: Removing comment #{comment.id} at {datetime.now()} due to its low score ({comment.score})."
-                        )
-                        print(f"'{comment.body}'")
-                        comment.delete()
-                # check every ~10 minutes
-                time.sleep(600)
-        except Exception:
-            logging.exception("DELETER: Caught an unknown exception.")
-            logging.info("DELETER: Waiting for 300 seconds before resuming")
-            time.sleep(300)
 
 
 def check_comment_id(id):
@@ -172,55 +152,6 @@ def parse_comment(comment):
     return search_tags
 
 
-def remove_implicated_tags(original_tags):
-    """
-    E621 includes implicated tags (e.g. cat implies feline) in the tags
-    and they are unnecessary. This function uses the tag implications from the
-    implicated_tags.txt file to remove them so that only the most specific tag remains.
-    """
-
-    original_tags = set(original_tags)
-    unnecessary_tags = set()
-
-    for tag in original_tags:
-        if tag in TAG_IMPLICATIONS:
-            unnecessary_tags.update(TAG_IMPLICATIONS[tag])
-
-    return sorted(original_tags - unnecessary_tags), len(original_tags & unnecessary_tags)
-
-
-def search(search_tags, TAG_BLACKLIST, no_score_limit=False):
-    """
-    Performs a search on e621 and returns the posts in a list of dicts.
-    Applies a blacklist if the search is determined to be NSFW.
-    no_score_limit can remove the score limit from the search.
-    """
-
-    BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom+score%3A>19"
-    UNSCORED_BASE_LINK = "https://e621.net/posts.json?tags=order%3Arandom"
-    # determine if the search is guaranteed to be sfw or not
-    is_safe = ("rating:s" in search_tags) or ("rating:safe" in search_tags)
-
-    # choose which base link to use based on no_score_limit
-    search_link = UNSCORED_BASE_LINK if no_score_limit else BASE_LINK
-
-    if not is_safe:
-        search_link += "+-" + "+-".join(TAG_BLACKLIST)
-    # and in both cases we add the search cases (obviously)
-    search_link += "+" + "+".join(search_tags)
-
-    r = requests.get(
-        search_link,
-        headers=E621_HEADER,
-        auth=e621_auth,
-    )
-    r.raise_for_status()
-    result_json = r.text
-
-    # parse the response json into a list of dicts, where each post is a dict
-    return list(json.loads(result_json)["posts"])
-
-
 def process_comment(comment):
     """
     The actual processing of the bot.
@@ -275,7 +206,7 @@ def process_comment(comment):
         print(f"replied with blacklist at {datetime.now()}")
         return
 
-    posts = search(search_tags, TAG_BLACKLIST)
+    posts = e621.search(search_tags, TAG_BLACKLIST)
 
     # if no posts were found, search again to make error message more specific
     if len(posts) == 0:
@@ -283,7 +214,7 @@ def process_comment(comment):
         # but wait for a second to definitely not hit the limit rate
         time.sleep(1)
         # re-search posts without the score limit
-        posts = search(search_tags, TAG_BLACKLIST, no_score_limit=True)
+        posts = e621.search(search_tags, TAG_BLACKLIST, E621_HEADER, E621_AUTH, no_score_limit=True)
         # which we use to explain why there were no results,
         # since the bot can sometimes be confusing to use
         if len(posts) == 0:
@@ -295,7 +226,8 @@ def process_comment(comment):
     else:
         first_post = posts[0]
 
-        # Find url of first post. Oddly everything else has a cool direct link into it, but the json only supplies the id of the post and not the link.
+        # Find url of first post. Oddly everything else has a cool direct link into it,
+        # but the json only supplies the id of the post and not the link.
         page_url = "https://e621.net/posts/" + str(first_post["id"])
 
         # Tags are separated into general species etc so combine them into one
@@ -303,13 +235,10 @@ def process_comment(comment):
         # fix tags a bit by removing implicated tags.
         # So e.g. bird implicates avian, and we probably know
         # a bird is an avian and don't need *really* the avian tag.
-        removed_tags_count = 0
-        post_tag_list = []
-
-        for category in ["artist", "copyright", "character", "species", "lore", "general", "meta"]:
-            result, count = remove_implicated_tags(first_post["tags"][category])
-            post_tag_list += result
-            removed_tags_count += count
+        removed_tags_count, post_tag_list = e621.remove_implicated_tags_from_post(
+            first_post["tags"], TAG_IMPLICATIONS
+        )
+        # post_tag_list is still ordered based on the category order (artist, copyright, etc...)
 
         # Check for swf/flash first before setting direct link to full image.
         if first_post["file"]["ext"] == "swf":
@@ -326,6 +255,7 @@ def process_comment(comment):
         post_tag_list = [
             tag.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`") for tag in post_tag_list
         ]
+
         tags_message = f"**^^Post ^^Tags:** ^^{' ^^'.join(post_tag_list[:TAG_CUTOFF])}"
         # if there are more than 25, add an additional message, replacing the rest
         if len(post_tag_list) > TAG_CUTOFF:
@@ -369,24 +299,12 @@ def process_comment(comment):
     time.sleep(5)
 
 
-def wrapper():
-    """
-    Wrapper that checks a stream and calls process_comment on them.
-    Only necessary because PRAW likes to sometimes throw exceptions
-    when Reddit's servers are broken (which happens ridiculously often)
-    instead of trying again.
-    """
-
-    for comment in subreddit.stream.comments():
-        process_comment(comment)
-
-
 # launch comment deleter in its own thread and pass its Reddit instance to it
+# doesn't need a loop since it won't crash randomly
 print("Creating and starting deleter_thread")
 deleter_reddit = authenticate_reddit()
-deleter_thread = threading.Thread(target=deleter_function, args=(deleter_reddit,), daemon=True)
+deleter_thread = threading.Thread(target=deleter.deleter_function, args=(deleter_reddit,), daemon=True)
 deleter_thread.start()
-
 
 # since PRAW doesn't handle the usual 503 errors caused by reddit's awful servers,
 # they have to be handled manually. Additionally, whenever an error is raised, the
@@ -395,7 +313,8 @@ deleter_thread.start()
 while True:
     try:
         print(f"Starting bot at {datetime.now()}")
-        wrapper()
+        for comment in subreddit.stream.comments():
+            process_comment(comment)
     except praw.exceptions.RedditAPIException:
         logging.exception("Caught a Reddit API error.")
         logging.info("Waiting for 60 seconds.")
