@@ -206,7 +206,7 @@ def process_comment(comment):
         print(f"replied with blacklist at {datetime.now()}")
         return
 
-    posts = e621.search(search_tags, TAG_BLACKLIST)
+    posts = e621.search(search_tags, TAG_BLACKLIST, E621_HEADER, E621_AUTH)
 
     # if no posts were found, search again to make error message more specific
     if len(posts) == 0:
@@ -235,7 +235,7 @@ def process_comment(comment):
         # fix tags a bit by removing implicated tags.
         # So e.g. bird implicates avian, and we probably know
         # a bird is an avian and don't need *really* the avian tag.
-        removed_tags_count, post_tag_list = e621.remove_implicated_tags_from_post(
+        post_tag_list, removed_tags_count = e621.remove_implicated_tags_from_post(
             first_post["tags"], TAG_IMPLICATIONS
         )
         # post_tag_list is still ordered based on the category order (artist, copyright, etc...)
