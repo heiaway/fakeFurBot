@@ -38,14 +38,14 @@ def deimplicate(original_tags, tag_implications_list):
     return sorted(original_tags - unnecessary_tags), len(original_tags & unnecessary_tags)
 
 
-def search(search_tags, tag_blacklist, e621_header, e621_auth, no_score_limit=False):
+def search(search_tags, tag_blacklist, e621_header, e621_auth, no_score_limit=False, min_score=25):
     """
     Performs a search on e621 and returns the posts in a list of dicts.
     Applies a blacklist if the search is determined to be NSFW.
     no_score_limit can remove the score limit from the search.
     """
 
-    base_link = "https://e621.net/posts.json?tags=order%3Arandom+score%3A>19"
+    base_link = f"https://e621.net/posts.json?tags=order%3Arandom+score%3A>={min_score}"
     unscored_base_link = "https://e621.net/posts.json?tags=order%3Arandom"
     # determine if the search is guaranteed to be sfw or not
     is_safe = ("rating:s" in search_tags) or ("rating:safe" in search_tags)
