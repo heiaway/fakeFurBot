@@ -240,11 +240,7 @@ def process_comment(comment):
         )
         # post_tag_list is still ordered based on the category order (artist, copyright, etc...)
 
-        # Check for swf/flash first before setting direct link to full image.
-        if first_post["file"]["ext"] == "swf":
-            direct_link = "Flash animation. Check the post."
-        else:
-            direct_link = f"[Direct Link]({first_post['file']['url']})"
+        direct_link = f"[Direct Link]({first_post['file']['url']})"
         link_text = f"[Post]({page_url}) | {direct_link} | Score: {first_post['score']['total']}"
 
     # create the small tag list
