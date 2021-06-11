@@ -75,13 +75,15 @@ TAG_CUTOFF = 25
 
 COMMENT_FOOTER = (
     "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating. "
-    "^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\(safe, ^^no ^^blacklist\), ^^`rating:q` ^^\(questionable\), ^^or ^^`rating:e` ^^\(explicit\). "
+    "^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\\(safe, ^^no ^^blacklist\\), "
+    "^^`rating:q` ^^\\(questionable\\), ^^or ^^`rating:e` ^^\\(explicit\\). "
     "^^Results ^^have ^^score ^^limit ^^of ^^20."
     "\n"
     "\n"
     "^^I ^^am ^^a ^^bot ^^and ^^a ^^replacement ^^for ^^the ^^realer ^^and ^^original ^^furbot. "
     "^^Any ^^comments ^^below ^^0 ^^score ^^will ^^be ^^removed. "
-    "^^Please ^^contact ^^\/u\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy, ^^to ^^request ^^features, ^^or ^^for ^^any ^^other ^^reasons. [^^Source  ^^code.](https://github.com/vaisest/fakeFurBot)\n"
+    "^^Please ^^contact ^^\\/u\\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy, ^^to ^^request ^^features, "
+    "^^or ^^for ^^any ^^other ^^reasons. [^^Source  ^^code.](https://github.com/vaisest/fakeFurBot)\n"
 )
 
 
@@ -235,7 +237,7 @@ def process_comment(comment):
         # fix tags a bit by removing implicated tags.
         # So e.g. bird implicates avian, and we probably know
         # a bird is an avian and don't need *really* the avian tag.
-        post_tag_list, removed_tags_count = e621.remove_implicated_tags_from_post(
+        post_tag_list, removed_tags_count = e621.remove_implicated_tags(
             first_post["tags"], TAG_IMPLICATIONS
         )
         # post_tag_list is still ordered based on the category order (artist, copyright, etc...)
@@ -265,7 +267,10 @@ def process_comment(comment):
     # here we handle a fringe case where the user inputs "furbot search"
     # without any tags and give an explanation for the result
     if len(search_tags) == 0:
-        explanation_text = "It seems that you did not input any tags in your search. Anyway, here is a random result from e621:"
+        explanation_text = (
+            "It seems that you did not input any tags in your search."
+            "Anyway, here is a random result from e621:"
+        )
     else:
         explanation_text = "Here are the results for your search:"
 
