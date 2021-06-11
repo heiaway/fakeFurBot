@@ -258,10 +258,10 @@ def process_comment(comment):
         # if there are more than 25, add an additional message, replacing the rest
         if len(post_tag_list) > TAG_CUTOFF:
             tags_message += (
-                f" **^^and ^^{len(post_tag_list) - TAG_CUTOFF + removed_tags_count} ^^more ^^tags**"
+                f", **^^and ^^{len(post_tag_list) - TAG_CUTOFF + removed_tags_count} ^^more ^^tags**"
             )
         elif removed_tags_count > 0:
-            tags_message += f" **^^and ^^{removed_tags_count} ^^more ^^tags**"
+            tags_message += f", **^^and ^^{removed_tags_count} ^^more ^^tags**"
 
     # next start composing the final message
     # here we handle a fringe case where the user inputs "furbot search"
