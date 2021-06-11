@@ -198,7 +198,7 @@ def process_comment(comment):
         message_body = (
             f"Hello, {comment.author.name}.\n"
             "\n"
-            f"The following tags are blacklisted and were in your search: {' '.join(intersection)}\n"
+            f"The following tags are blacklisted and were in your search: {', '.join(intersection)}\n"
             "\n"
             "---\n"
             "\n" + COMMENT_FOOTER
@@ -254,7 +254,7 @@ def process_comment(comment):
             tag.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`") for tag in post_tag_list
         ]
 
-        tags_message = f"**^^Post ^^Tags:** ^^{' ^^'.join(post_tag_list[:TAG_CUTOFF])}"
+        tags_message = f"**^^Post ^^Tags:** ^^{', ^^'.join(post_tag_list[:TAG_CUTOFF])}"
         # if there are more than 25, add an additional message, replacing the rest
         if len(post_tag_list) > TAG_CUTOFF:
             tags_message += (
