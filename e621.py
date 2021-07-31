@@ -1,5 +1,3 @@
-import json
-
 import requests
 
 
@@ -63,4 +61,4 @@ def search(search_tags, tag_blacklist, e621_header, e621_auth, no_score_limit=Fa
     result.raise_for_status()
 
     # parse the response json into a list of dicts, where each post is a dict
-    return list(json.loads(result.text)["posts"])
+    return list(result.json()["posts"])

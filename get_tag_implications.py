@@ -1,4 +1,3 @@
-import json
 import time
 
 import requests
@@ -25,7 +24,7 @@ while True:
         headers=E621_HEADER,
     )
     r.raise_for_status()
-    js = json.loads(r.text)
+    js = r.json()
 
     base_list += js
 

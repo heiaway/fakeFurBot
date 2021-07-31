@@ -1,4 +1,3 @@
-import json
 import time
 
 import requests
@@ -11,7 +10,7 @@ def get_aliases(tag):
     search_link = f"https://e621.net/tag_aliases.json?search[name_matches]={tag}"
     r = requests.get(search_link, headers=E621_HEADER)
     r.raise_for_status()
-    js = json.loads(r.text)
+    js = r.json()
     return js
 
 
