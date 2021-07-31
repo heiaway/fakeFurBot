@@ -20,7 +20,7 @@ import e621
 
 
 def authenticate_reddit():
-    """Authenticate on reddit and return a new PRAW Reddit instance."""
+    """Authenticate on reddit with info from config."""
 
     return praw.Reddit(
         client_id=config.client_id,
@@ -34,23 +34,21 @@ def authenticate_reddit():
 bot_reddit = authenticate_reddit()
 subreddit = bot_reddit.subreddit("furry_irl")
 
-# change the name to be clearer since the bot's name will be used later
-# bot_username = file_info[3]
-
 # requests user agent header
 E621_HEADER = {"User-Agent": "/r/Furry_irl FakeFurBot by reddit.com/u/heittoaway"}
 
-# we have to log in to e621 since otherwise
+# we only have to log in to e621 because otherwise
 # the API will give "null" on any post's url that
 # contains tags that are on the global blacklist
 E621_AUTH = (config.e621_user, config.e621_pass)
 
 
 # load constants:
-print("Reading blacklisted tags from generated_blacklist.txt")
 try:
+    print("Reading blacklisted tags from generated_blacklist.txt")
     with open("generated_blacklist.txt", "r") as f:
         ALIASED_TAG_BLACKLIST = f.read().split("\n")
+
     # this is due to e621 having a 40 tag limit, so we can't use all blacklisted tag aliases
     print("Reading base blacklist from blacklist.txt")
     with open("blacklist.txt", "r") as f:
@@ -70,14 +68,15 @@ except OSError:
         "Failed to open tag lists generated_blacklist.txt, blacklist.txt, and implicated_tags.txt"
     )
 
-# how many tags are put in the comment
+# how many tags are put in the comment and minimum score
 TAG_CUTOFF = 25
+MIN_SCORE = 25
 
 COMMENT_FOOTER = (
     "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating. "
     "^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\\(safe, ^^no ^^blacklist\\), "
     "^^`rating:q` ^^\\(questionable\\), ^^or ^^`rating:e` ^^\\(explicit\\). "
-    "^^Results ^^have ^^score ^^limit ^^of ^^20."
+    f"^^Results ^^have ^^score ^^limit ^^of ^^{MIN_SCORE}."
     "\n"
     "\n"
     "^^I ^^am ^^a ^^bot ^^and ^^a ^^replacement ^^for ^^the ^^realer ^^and ^^original ^^furbot. "
@@ -88,11 +87,7 @@ COMMENT_FOOTER = (
 
 
 def check_comment_id(id):
-    """
-    Checks the file comment_ids.txt in current working directory and
-    returns True if the id is in the file.
-    Used to check for already processed comments.
-    """
+    """Checks if comment_ids.txt in current working directory contains id."""
 
     with open("comment_ids.txt", "r") as f:
         id_list = f.read().split("\n")
@@ -100,10 +95,7 @@ def check_comment_id(id):
 
 
 def add_comment_id(id):
-    """
-    Adds a comment id to comment_ids.txt in the current working directory
-    to signify that the comment has already been processed.
-    """
+    """Adds a comment id to comment_ids.txt in current working directory."""
 
     with open("comment_ids.txt", "a") as f:
         f.write(f"{id}\n")
@@ -111,8 +103,8 @@ def add_comment_id(id):
 
 def can_process(comment):
     """
-    Checks if the comment can be processed via check_comment_id()
-    and makes sure the bot doesn't reply to its own comments.
+    Checks if the comment has been processed before and
+    makes sure the bot doesn't reply to its own comments.
     Then it checks for a \"furbot search ??\" command.
     """
 
@@ -127,11 +119,7 @@ def can_process(comment):
 
 
 def parse_comment(comment):
-    """
-    Parses the \"furbot search\" command from the comment while
-    removing escaped backslashes, which commonly mess up searches.
-    Returns the search tags in a list of strings.
-    """
+    """Parses the "furbot search" command from the comment and removes escaped backslashes."""
 
     comment_body = comment.body.replace("\\", "")
 
@@ -158,11 +146,11 @@ def process_comment(comment):
     """
     The actual processing of the bot.
     It will check if it can process the comment, parses tags from it and searches.
-    If the comment contains blacklisted tags or too many tags it will answer accordingly.
+    If the search contains blacklisted tags or too many tags it will answer accordingly.
     If posts were found the bot will make sure that it wasn't because of the score limit
     and if it was it will explain it.
 
-    The result will contain an explanation text, links to the post and a direct link to the image/video,
+    The result is an explanation text, link to the post, a direct link,
     a small list of the tags, and a footer explaining some things.
     """
     if not can_process(comment):
@@ -208,7 +196,7 @@ def process_comment(comment):
         print(f"replied with blacklist at {datetime.now()}")
         return
 
-    posts = e621.search(search_tags, TAG_BLACKLIST, E621_HEADER, E621_AUTH)
+    posts = e621.search(search_tags, TAG_BLACKLIST, E621_HEADER, E621_AUTH, min_score=MIN_SCORE)
 
     # if no posts were found, search again to make error message more specific
     if len(posts) == 0:
@@ -222,7 +210,7 @@ def process_comment(comment):
         if len(posts) == 0:
             link_text = "No results found. You may have an invalid tag, or all possible results had blacklisted tags."
         else:
-            link_text = "No results found. All results had a score below 20."
+            link_text = f"No results found. All results had a score below {MIN_SCORE}."
         post_tag_list = []
     # create the Post | Direct link text and save tags
     else:
