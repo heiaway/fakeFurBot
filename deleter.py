@@ -22,9 +22,9 @@ def deleter_function(deleter_reddit):
                         )
                         print(f"'{comment.body}'")
                         comment.delete()
-                # check every ~10 minutes
-                time.sleep(600)
+                # check every ~30 minutes
+                time.sleep(1800)
         except Exception:
             logging.exception("DELETER: Caught an unknown exception.")
-            logging.info("DELETER: Waiting for 300 seconds before resuming")
-            time.sleep(300)
+            logging.info("DELETER: Waiting for 10 minutes before resuming")
+            time.sleep(600)
