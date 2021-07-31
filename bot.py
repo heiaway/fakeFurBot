@@ -7,7 +7,7 @@ from collections import defaultdict
 from datetime import datetime
 
 import praw
-import requests
+
 
 # this is so we can handle the 503 errors caused by Reddit's servers being awful
 from prawcore.exceptions import ServerError
@@ -298,24 +298,11 @@ deleter_thread.start()
 # since PRAW doesn't handle the usual 503 errors caused by reddit's awful servers,
 # they have to be handled manually. Additionally, whenever an error is raised, the
 # stream stops, so we need an ugly wrapper:
-# This might have been changed in a PRAW update, but I'm not exactly sure if it works so this can stay
 while True:
     try:
         print(f"Starting bot at {datetime.now()}")
         for comment in subreddit.stream.comments():
             process_comment(comment)
-    except praw.exceptions.RedditAPIException:
-        logging.exception("Caught a Reddit API error.")
-        logging.info("Waiting for 60 seconds.")
-        time.sleep(60)
-    except requests.exceptions.HTTPError:
-        logging.exception("Caught an HTTPError.")
-        logging.info("Waiting for 60 seconds.")
-        time.sleep(60)
-    except requests.RequestException:
-        logging.exception("Caught an exception from requests.")
-        logging.info("Waiting for 60 seconds.")
-        time.sleep(60)
     except ServerError:
         logging.warning(
             "Caught an exception from prawcore caused by Reddit's 503 answers due to overloaded servers."
@@ -323,6 +310,6 @@ while True:
         logging.info("Waiting for 300 seconds.")
         time.sleep(300)
     except Exception:
-        logging.exception("Caught an unknown exception.")
+        logging.exception("Caught an unhandled exception.")
         logging.info("Waiting for 120 seconds.")
         time.sleep(120)
