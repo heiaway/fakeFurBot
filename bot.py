@@ -87,7 +87,7 @@ COMMENT_FOOTER = (
 
 
 def check_comment_id(id):
-    """Checks if comment_ids.txt in current working directory contains id."""
+    """Checks if ./comment_ids.txt contains id."""
 
     with open("comment_ids.txt", "r") as f:
         id_list = f.read().split("\n")
@@ -95,7 +95,7 @@ def check_comment_id(id):
 
 
 def add_comment_id(id):
-    """Adds a comment id to comment_ids.txt in current working directory."""
+    """Adds a comment id to ./comment_ids.txt."""
 
     with open("comment_ids.txt", "a") as f:
         f.write(f"{id}\n")
@@ -103,15 +103,14 @@ def add_comment_id(id):
 
 def can_process(comment):
     """
-    Checks if the comment has been processed before and
-    makes sure the bot doesn't reply to its own comments.
-    Then it checks for a \"furbot search ??\" command.
+    Checks if the comment has been processed before
+    so the bot doesn't reply to its own comments.
+    Then checks comment for \"furbot search ??\".
     """
 
     if check_comment_id(comment.id) or comment.author.name.lower() == config.reddit_user.lower():
         add_comment_id(comment.id)
         return False
-    # then check if there's actually a command
     # this means if all lines DO NOT have the command, skip
     if all("furbot search" not in line.lower() for line in comment.body.splitlines()):
         return False
@@ -119,7 +118,7 @@ def can_process(comment):
 
 
 def parse_comment(comment):
-    """Parses the "furbot search" command from the comment and removes escaped backslashes."""
+    """Parses command from the comment and removes escaped backslashes."""
 
     comment_body = comment.body.replace("\\", "")
 
@@ -144,11 +143,11 @@ def parse_comment(comment):
 
 def process_comment(comment):
     """
-    The actual processing of the bot.
+    The actual bot.
     It will check if it can process the comment, parses tags from it and searches.
-    If the search contains blacklisted tags or too many tags it will answer accordingly.
+    If the search contains blacklisted tags or too many tags it will answer with some info.
     If posts were found the bot will make sure that it wasn't because of the score limit
-    and if it was it will explain it.
+    and if it was it will say so.
 
     The result is an explanation text, link to the post, a direct link,
     a small list of the tags, and a footer explaining some things.
@@ -200,8 +199,7 @@ def process_comment(comment):
 
     # if no posts were found, search again to make error message more specific
     if len(posts) == 0:
-        # test if score was the problem by requesting another list from the site,
-        # but wait for a second to definitely not hit the limit rate
+        # rate-limit
         time.sleep(1)
         # re-search posts without the score limit
         posts = e621.search(search_tags, TAG_BLACKLIST, E621_HEADER, E621_AUTH, no_score_limit=True)
@@ -252,7 +250,7 @@ def process_comment(comment):
             tags_message += f", **^^and ^^{removed_tags_count} ^^more ^^tags**"
 
     # next start composing the final message
-    # here we handle a fringe case where the user inputs "furbot search"
+    # here we handle when the user inputs "furbot search"
     # without any tags and give an explanation for the result
     if len(search_tags) == 0:
         explanation_text = (
@@ -296,8 +294,8 @@ deleter_thread = threading.Thread(target=deleter.deleter_function, args=(deleter
 deleter_thread.start()
 
 # since PRAW doesn't handle the usual 503 errors caused by reddit's awful servers,
-# they have to be handled manually. Additionally, whenever an error is raised, the
-# stream stops, so we need an ugly wrapper:
+# they have to be handled manually. And when an error is raised, the
+# stream stops, so we need this ugly wrapper:
 while True:
     try:
         print(f"Starting bot at {datetime.now()}")
