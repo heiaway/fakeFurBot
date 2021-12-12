@@ -1,9 +1,8 @@
-
 login.txt
 login - Copy.txt
 .vscode/
 generated_blacklist.txt
-implicated_species_tags.txt
+implicated_tags.txt
 venv/
 win_venv/
 config.py
