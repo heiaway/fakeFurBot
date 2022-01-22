@@ -82,7 +82,7 @@ COMMENT_FOOTER = (
     "^^I ^^am ^^a ^^bot ^^and ^^a ^^replacement ^^for ^^the ^^realer ^^and ^^original ^^furbot. "
     "^^Any ^^comments ^^below ^^0 ^^score ^^will ^^be ^^removed. "
     "^^Please ^^contact ^^\\/u\\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy, ^^to ^^request ^^features, "
-    "^^or ^^for ^^any ^^other ^^reasons. ^^[Source ^^code](https://github.com/heiaway/fakeFurBot).\n"
+    "^^or ^^for ^^any ^^other ^^reasons. [^^Source ^^code.](https://github.com/heiaway/fakeFurBot)\n"
 )
 
 
