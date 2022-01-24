@@ -79,10 +79,10 @@ COMMENT_FOOTER = (
     f"^^Results ^^have ^^score ^^limit ^^of ^^{MIN_SCORE}."
     "\n"
     "\n"
-    "^^I ^^am ^^a ^^bot ^^and ^^a ^^replacement ^^for ^^the ^^realer ^^and ^^original ^^furbot. "
+    "^^I ^^am ^^a ^^bot ^^who ^^searches ^^e621 ^^based ^^on ^^given ^^tags. "
     "^^Any ^^comments ^^below ^^0 ^^score ^^will ^^be ^^removed. "
     "^^Please ^^contact ^^\\/u\\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy, ^^to ^^request ^^features, "
-    "^^or ^^for ^^any ^^other ^^reasons. [^^Source ^^code.](https://github.com/heiaway/fakeFurBot)\n"
+    "^^or ^^for ^^any ^^other ^^reason. [^^Source ^^code.](https://github.com/heiaway/fakeFurBot)\n"
 )
 
 
@@ -206,7 +206,10 @@ def process_comment(comment):
         # which we use to explain why there were no results,
         # since the bot can sometimes be confusing to use
         if len(posts) == 0:
-            link_text = "No results found. You may have an invalid tag, or all possible results had blacklisted tags."
+            link_text = (
+                "No results found. You may have an invalid e621 tag, or all possible results had blacklisted tags. "
+                "The command format should be `furbot search e621_tag another_e621_tag`. Read [e621's search cheatsheet](https://e621.net/help/cheatsheet) for more info."
+            )
         else:
             link_text = f"No results found. All results had a score below {MIN_SCORE}."
         post_tag_list = []
@@ -254,7 +257,7 @@ def process_comment(comment):
     # without any tags and give an explanation for the result
     if len(search_tags) == 0:
         explanation_text = (
-            "It seems that you did not input any tags in your search."
+            "It seems that you did not input any tags in your search. "
             "Anyway, here is a random result from e621:"
         )
     else:
