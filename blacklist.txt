@@ -14,4 +14,4 @@ shota
 infestation
 necrophilia
 death
-flash
+type:swf

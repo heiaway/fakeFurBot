@@ -2,14 +2,10 @@ import requests
 
 
 def remove_implicated_tags(post_tags, tag_implications_list):
-    """
-    Removes implicated tags from the tags in a post and preserves category order.
-    Takes the list of tag lists from an e621 post as an argument.
-    deimplicate does the actual removing.
-    """
+    """Removes implicated tags from the tag list with deimplicate()"""
+
     removed_tags_count = 0
     post_tag_list = []
-
     for category in ["artist", "copyright", "character", "species", "lore", "general", "meta"]:
         result, count = deimplicate(post_tags[category], tag_implications_list)
         post_tag_list += result
@@ -18,10 +14,7 @@ def remove_implicated_tags(post_tags, tag_implications_list):
 
 
 def deimplicate(original_tags, tag_implications_list):
-    """
-    Uses the tag implications to remove them
-    so only the most specific tag remains.
-    """
+    """Uses the tag implication list to keep only the most specific tag."""
 
     original_tags = set(original_tags)
     unnecessary_tags = set()
@@ -36,8 +29,7 @@ def deimplicate(original_tags, tag_implications_list):
 def search(search_tags, tag_blacklist, e621_header, e621_auth, no_score_limit=False, min_score=0):
     """
     Searches on e621 and returns a list of dicts.
-    Applies a blacklist if the search is NSFW.
-    no_score_limit removes the score limit from the search.
+    Applies a blacklist if the search is NSFW and no_score_limit isn't true.
     """
 
     base_link = f"https://e621.net/posts.json?tags=order%3Arandom+score%3A>={min_score}"

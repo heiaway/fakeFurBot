@@ -1,20 +1,20 @@
 #!/usr/bin/env python3.8
 import logging
+import random
 import re
 import threading
 import time
 from collections import defaultdict
 from datetime import datetime
 
+# load variables: client_id,client_secret,password,username,e621_username,e621_key
+# config.py is just python code like `client_id = "abc123"`
+import config
 import praw
-
 
 # this is so we can handle the 503 errors caused by Reddit's servers being awful
 from prawcore.exceptions import ServerError
 
-# load variables: client_id,client_secret,password,username,e621_username,e621_key
-# config.py is just python code like `client_id = "abc123"`
-import config
 import deleter
 import e621
 
@@ -34,10 +34,14 @@ def authenticate_reddit():
 bot_reddit = authenticate_reddit()
 subreddit = bot_reddit.subreddit("furry_irl")
 
+# logger
+logging.basicConfig(format="%(asctime)s %(message)s")
+logger = logging.getLogger(__name__)
+
 # requests user agent header
 E621_HEADER = {"User-Agent": "/r/Furry_irl FakeFurBot by reddit.com/u/heittoaway"}
 
-# we only have to log in to e621 because otherwise
+# we have to log in to e621 because otherwise
 # the API will give "null" on any post's url that
 # contains tags that are on the global blacklist
 E621_AUTH = (config.e621_user, config.e621_pass)
@@ -64,7 +68,7 @@ try:
             original, implied = item.split("%")
             TAG_IMPLICATIONS[original] += [implied]
 except OSError:
-    logging.exception(
+    logger.exception(
         "Failed to open tag lists generated_blacklist.txt, blacklist.txt, and implicated_tags.txt"
     )
 
@@ -72,21 +76,24 @@ except OSError:
 TAG_CUTOFF = 25
 MIN_SCORE = 25
 
-COMMENT_FOOTER = (
-    "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating. "
-    "^^You ^^can ^^limit ^^the ^^search ^^with ^^`rating:s` ^^\\(safe, ^^no ^^blacklist\\), "
+UPPER_FOOTER = (
+    "^^By ^^default ^^this ^^bot ^^does ^^not ^^search ^^for ^^a ^^specific ^^rating, "
+    "^^but ^^you ^^can ^^do ^^so ^^with ^^`rating:s` ^^\\(safe, ^^no ^^blacklist\\), "
     "^^`rating:q` ^^\\(questionable\\), ^^or ^^`rating:e` ^^\\(explicit\\). "
     f"^^Results ^^have ^^score ^^limit ^^of ^^{MIN_SCORE}."
-    "\n"
-    "\n"
+)
+
+LOWER_FOOTER = (
     "^^I ^^am ^^a ^^bot ^^who ^^searches ^^e621 ^^based ^^on ^^given ^^tags. "
     "^^Any ^^comments ^^below ^^0 ^^score ^^will ^^be ^^removed. "
     "^^Please ^^contact ^^\\/u\\/heittoaway ^^if ^^this ^^bot ^^is ^^going ^^crazy, ^^to ^^request ^^features, "
     "^^or ^^for ^^any ^^other ^^reason. [^^Source ^^code.](https://github.com/heiaway/fakeFurBot)\n"
 )
 
+COMMENT_FOOTER = UPPER_FOOTER + "\n" "\n" + LOWER_FOOTER
 
-def check_comment_id(id):
+
+def comment_id_processed(id):
     """Checks if ./comment_ids.txt contains id."""
 
     with open("comment_ids.txt", "r") as f:
@@ -95,7 +102,7 @@ def check_comment_id(id):
 
 
 def add_comment_id(id):
-    """Adds a comment id to ./comment_ids.txt."""
+    """Adds id to ./comment_ids.txt."""
 
     with open("comment_ids.txt", "a") as f:
         f.write(f"{id}\n")
@@ -103,12 +110,11 @@ def add_comment_id(id):
 
 def can_process(comment):
     """
-    Checks if the comment has been processed before
-    so the bot doesn't reply to its own comments.
-    Then checks comment for \"furbot search ??\".
+    Checks if the comment id has been processed before
+    and checks comment for \"furbot search ??\".
     """
 
-    if check_comment_id(comment.id) or comment.author.name.lower() == config.reddit_user.lower():
+    if comment_id_processed(comment.id) or comment.author.name.lower() == config.reddit_user.lower():
         add_comment_id(comment.id)
         return False
     # this means if all lines DO NOT have the command, skip
@@ -118,11 +124,11 @@ def can_process(comment):
 
 
 def parse_comment(comment):
-    """Parses command from the comment and removes escaped backslashes."""
+    """Parses command from comment and removes escaped backslashes."""
 
     comment_body = comment.body.replace("\\", "")
 
-    # assign regex_result as None to get around fringe case where the user inputs only furbot search and nothing else
+    # sometimes the user inputs only furbot search and nothing else so there is no match later
     regex_result = None
 
     for line in comment_body.splitlines():
@@ -130,69 +136,120 @@ def parse_comment(comment):
         # with an optional u/ or /u/ at the start
         if regex := re.search(r"^.*\/?(?:u\/)?furbot search (.+)", line.lower()):
             regex_result = regex.group(1)
-            # we don't want multiple matches so break out
             break
 
-    if regex_result:
-        search_tags = regex_result.split(" ")
-    else:
-        search_tags = []
-
+    search_tags = regex_result.split(" ") if regex_result else []
+    logger.debug(search_tags)
     return search_tags
+
+
+def reply(
+    comment,
+    explanation_text,
+    search_tags=[],
+    link_text="",
+    tags_text="",
+    explanation_is_error=False,
+    greetings=True,
+    upper_footer=True,
+):
+    """
+    Reply based on a template and lots of options.
+    """
+
+    print("replying...")
+    logger.info(f"replying to id {comment.id}")
+
+    hellos = ["Hello", "Howdy", "Hi", "Hey", "Hey there"]
+
+    # SyntaxError: f-string expression part cannot include a backslash
+    # chr(10) is \n
+    message_body = (
+        (f"{random.choice(hellos)}, {comment.author.name}." if greetings else "")
+        + f"{chr(10)+chr(10) if explanation_is_error else ' '}{explanation_text}\n"
+        "\n"
+        f"{' '.join(search_tags)}\n"
+        "\n"
+        f"{link_text}\n"
+        "\n"
+        f"{tags_text}\n"
+        "\n"
+        "---\n"
+        "\n" + (UPPER_FOOTER if upper_footer else "") + LOWER_FOOTER
+    )
+    logger.debug(message_body)
+    comment.reply(message_body)
+
+
+def cancel_incorrect_search_and_reply(comment, search_tags):
+    """Cancels search, replies, and returns True if necessary."""
+
+    is_safe = ("rating:s" in search_tags) or ("rating:safe" in search_tags)
+    # prevent bot abuse with too many tags
+    if (not is_safe and (len(search_tags) + len(TAG_BLACKLIST) >= 40)) or (
+        is_safe and len(search_tags) > 40
+    ):
+        explanation_text = f"There are more than {40-len(TAG_BLACKLIST) if not is_safe else 40} tags. Please try searching with fewer tags.\n"
+        reply(comment, explanation_text, explanation_is_error=True)
+        add_comment_id(comment.id)
+        print(f"replied with too many tags to {comment.id} at {datetime.now()}")
+        return True
+
+    # cancel search for blacklisted tags
+    # below means (if any search tag is in the blacklist) and (search is not sfw)
+    if (len(intersection := set(search_tags) & set(ALIASED_TAG_BLACKLIST)) != 0) and (not is_safe):
+        explanation_text = "The following tags are blacklisted and were in your search:"
+        reply(comment, explanation_text, intersection)
+        add_comment_id(comment.id)
+        print(f"replied with blacklist to {comment.id} at {datetime.now()}")
+        return True
+
+    return False
+
+
+def can_reply_to_good_bot(comment):
+    if comment.is_root:
+        return False
+
+    parent = comment.parent()
+    parent.refresh()
+    if parent.author is None:
+        return False
+
+    is_reply = parent.author.name.lower() == config.reddit_user.lower()
+
+    return is_reply and not comment_id_processed(comment.id) and "good bot" in comment.body.lower()
+
+
+def good_bot_reply(comment):
+    explanation_text = f"Thank you {comment.author}! I am glad I could be helpful. \\^^"
+    reply(comment, explanation_text, greetings=False, upper_footer=False)
+    add_comment_id(comment.id)
+    print(f"replied to good bot {comment.id} at {datetime.now()}")
 
 
 def process_comment(comment):
     """
     The actual bot.
-    It will check if it can process the comment, parses tags from it and searches.
+    It will check if it can process the comment, parses tags and searches.
     If the search contains blacklisted tags or too many tags it will answer with some info.
     If posts were found the bot will make sure that it wasn't because of the score limit
-    and if it was it will say so.
-
-    The result is an explanation text, link to the post, a direct link,
-    a small list of the tags, and a footer explaining some things.
+    and if it was it will reply so.
     """
+
+    # check if comment is a reply to the bot's comment and reply
+    if can_reply_to_good_bot(comment):
+        good_bot_reply(comment)
+        return
+
     if not can_process(comment):
         return
 
-    print(f"processing #{comment.id}")
+    print(f"processing #{comment.id} at {datetime.now()}")
 
     search_tags = parse_comment(comment)
 
-    # prevent bot abuse with too many tags
-    is_safe = ("rating:s" in search_tags) or ("rating:safe" in search_tags)
-    if (not is_safe and (len(search_tags) + len(TAG_BLACKLIST) >= 40)) or (
-        is_safe and len(search_tags) > 40
-    ):
-        print("replying...")
-        message_body = (
-            f"Hello, {comment.author.name}.\n"
-            "\n"
-            f"There are more than {40-len(TAG_BLACKLIST) if not is_safe else 40} tags. Please try searching with fewer tags.\n"
-            "\n"
-            "---\n"
-            "\n" + COMMENT_FOOTER
-        )
-        add_comment_id(comment.id)
-        comment.reply(message_body)
-        print("replied with too many tags")
-        return
-
-    # cancel search for blacklisted tags
-    # below means (if any search tag is in the blacklist) and (search is not sfw)
-    if (len(intersection := set(search_tags) & set(ALIASED_TAG_BLACKLIST)) != 0) and (not is_safe):
-        print("replying...")
-        message_body = (
-            f"Hello, {comment.author.name}.\n"
-            "\n"
-            f"The following tags are blacklisted and were in your search: {', '.join(intersection)}\n"
-            "\n"
-            "---\n"
-            "\n" + COMMENT_FOOTER
-        )
-        add_comment_id(comment.id)
-        comment.reply(message_body)
-        print(f"replied with blacklist at {datetime.now()}")
+    if cancel_incorrect_search_and_reply(comment, search_tags):
         return
 
     posts = e621.search(search_tags, TAG_BLACKLIST, E621_HEADER, E621_AUTH, min_score=MIN_SCORE)
@@ -236,32 +293,21 @@ def process_comment(comment):
 
     # create the small tag list
     if len(post_tag_list) == 0:
-        tags_message = ""
+        tags_text = ""
     else:
         # clean up tag list from any markdown characters
         post_tag_list = [
             tag.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`") for tag in post_tag_list
         ]
 
-        tags_message = f"**^^Post ^^Tags:** ^^{', ^^'.join(post_tag_list[:TAG_CUTOFF])}"
+        tags_text = f"**^^Post ^^Tags:** ^^{', ^^'.join(post_tag_list[:TAG_CUTOFF])}"
         # if there are more than 25, add an additional message, replacing the rest
         if len(post_tag_list) > TAG_CUTOFF:
-            tags_message += (
+            tags_text += (
                 f", **^^and ^^{len(post_tag_list) - TAG_CUTOFF + removed_tags_count} ^^more ^^tags**"
             )
         elif removed_tags_count > 0:
-            tags_message += f", **^^and ^^{removed_tags_count} ^^more ^^tags**"
-
-    # next start composing the final message
-    # here we handle when the user inputs "furbot search"
-    # without any tags and give an explanation for the result
-    if len(search_tags) == 0:
-        explanation_text = (
-            "It seems that you did not input any tags in your search. "
-            "Anyway, here is a random result from e621:"
-        )
-    else:
-        explanation_text = "Here are the results for your search:"
+            tags_text += f", **^^and ^^{removed_tags_count} ^^more ^^tags**"
 
     # escape underscores etc markdown formatting characters from search_tags
     # since we're putting them in the reply
@@ -269,23 +315,22 @@ def process_comment(comment):
         tag.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`") for tag in search_tags
     ]
 
-    message_body = (
-        f"Hello, {comment.author.name}. {explanation_text}\n"
-        "\n"
-        f"{' '.join(search_tags)}\n"
-        "\n"
-        f"{link_text}\n"
-        "\n"
-        f"{tags_message}\n"
-        "\n"
-        "---\n"
-        "\n" + COMMENT_FOOTER
-    )
+    # compose final message
+    if "furbot" in search_tags:
+        explanation_text = "\>///< Okay, I guess if you want to see me."
+        reply(comment, explanation_text, search_tags, link_text, tags_text, greetings=False)
+    else:
+        if len(search_tags) == 0:
+            explanation_text = (
+                "It seems that you did not input any tags in your search. "
+                "Anyway, here is a random result from e621:"
+            )
+        else:
+            explanation_text = "Here are the results for your search:"
+        reply(comment, explanation_text, search_tags, link_text, tags_text)
 
-    print("replying...")
-    comment.reply(message_body)
     add_comment_id(comment.id)
-    print(f"succesfully replied at {datetime.now()}")
+    print(f"succesfully replied to {comment.id} at {datetime.now()}")
     time.sleep(5)
 
 
@@ -305,12 +350,12 @@ while True:
         for comment in subreddit.stream.comments():
             process_comment(comment)
     except ServerError:
-        logging.warning(
+        logger.warning(
             "Caught an exception from prawcore caused by Reddit's 503 answers due to overloaded servers."
         )
-        logging.info("Waiting for 300 seconds.")
+        print("Waiting for 300 seconds.")
         time.sleep(300)
     except Exception:
-        logging.exception("Caught an unhandled exception.")
-        logging.info("Waiting for 120 seconds.")
+        logger.exception("Caught an unhandled exception.")
+        print("Waiting for 120 seconds.")
         time.sleep(120)

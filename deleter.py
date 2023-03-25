@@ -2,9 +2,12 @@ import logging
 import time
 from datetime import datetime
 
+# logger
+logger = logging.getLogger(__name__)
+
 
 def deleter_function(deleter_reddit):
-    """Function that deletes the bot's comments below 0 score on a 10 minute loop."""
+    """Function that deletes the bot's comments below 0 score on a 30 minute loop."""
 
     user = deleter_reddit.user.me()
     # as usual the PRAW stream error problem needs a loop:
@@ -25,6 +28,5 @@ def deleter_function(deleter_reddit):
                 # check every ~30 minutes
                 time.sleep(1800)
         except Exception:
-            logging.exception("DELETER: Caught an unknown exception.")
-            logging.info("DELETER: Waiting for 10 minutes before resuming")
+            logger.exception("Caught an unknown exception. Waiting for 10 minutes before resuming.")
             time.sleep(600)
