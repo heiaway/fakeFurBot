@@ -2,7 +2,6 @@ import logging
 import time
 from datetime import datetime
 
-# logger
 logger = logging.getLogger(__name__)
 
 
@@ -16,7 +15,7 @@ def deleter_function(deleter_reddit):
             print(f"DELETER: Starting deleter at {datetime.now()}")
             while True:
                 # the first 200 comments ought to be enough, and should
-                # limit the amount of time spent on this simple task
+                # limit the amount of time spent on this
                 comments = user.comments.new(limit=200)
                 for comment in comments:
                     if comment.score < 0:

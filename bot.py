@@ -34,7 +34,7 @@ def authenticate_reddit():
 bot_reddit = authenticate_reddit()
 subreddit = bot_reddit.subreddit("furry_irl")
 
-# logger
+
 logging.basicConfig(format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
