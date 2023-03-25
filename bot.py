@@ -35,8 +35,8 @@ bot_reddit = authenticate_reddit()
 subreddit = bot_reddit.subreddit("furry_irl")
 
 
-logging.basicConfig(format="%(asctime)s %(message)s")
-logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(levelname)s:%(name)s:%(asctime)s: %(message)s")
+logger = logging.getLogger("furbot")
 
 # requests user agent header
 E621_HEADER = {"User-Agent": "/r/Furry_irl FakeFurBot by reddit.com/u/heittoaway"}
