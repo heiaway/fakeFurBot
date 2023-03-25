@@ -114,7 +114,10 @@ def can_process(comment):
     and checks comment for \"furbot search ??\".
     """
 
-    if comment_id_processed(comment.id) or comment.author.name.lower() == config.reddit_user.lower():
+    if (
+        comment_id_processed(comment.id)
+        or comment.author.name.lower() == config.reddit_user.lower()
+    ):
         add_comment_id(comment.id)
         return False
     # this means if all lines DO NOT have the command, skip
@@ -160,7 +163,10 @@ def reply(
     print("replying...")
     logger.info(f"replying to id {comment.id}")
 
-    hellos = ["Hello", "Howdy", "Hi", "Hey", "Hey there"]
+    rare_hellos = ["Howdy", "Hey there", "Meowdy"]
+    regular_hellos = ["Hello", "Hey", "Hi"]
+
+    hellos = random.choices([regular_hellos, rare_hellos], [10, 1])[0]
 
     # SyntaxError: f-string expression part cannot include a backslash
     # chr(10) is \n
@@ -182,7 +188,7 @@ def reply(
 
 
 def cancel_incorrect_search_and_reply(comment, search_tags):
-    """Cancels search, replies, and returns True if necessary."""
+    """Cancels search, replies, and returns True if canceling is necessary."""
 
     is_safe = ("rating:s" in search_tags) or ("rating:safe" in search_tags)
     # prevent bot abuse with too many tags
@@ -197,7 +203,9 @@ def cancel_incorrect_search_and_reply(comment, search_tags):
 
     # cancel search for blacklisted tags
     # below means (if any search tag is in the blacklist) and (search is not sfw)
-    if (len(intersection := set(search_tags) & set(ALIASED_TAG_BLACKLIST)) != 0) and (not is_safe):
+    if (len(intersection := set(search_tags) & set(ALIASED_TAG_BLACKLIST)) != 0) and (
+        not is_safe
+    ):
         explanation_text = "The following tags are blacklisted and were in your search:"
         reply(comment, explanation_text, intersection)
         add_comment_id(comment.id)
@@ -218,7 +226,11 @@ def can_reply_to_good_bot(comment):
 
     is_reply = parent.author.name.lower() == config.reddit_user.lower()
 
-    return is_reply and not comment_id_processed(comment.id) and "good bot" in comment.body.lower()
+    return (
+        is_reply
+        and not comment_id_processed(comment.id)
+        and "good bot" in comment.body.lower()
+    )
 
 
 def good_bot_reply(comment):
@@ -252,14 +264,18 @@ def process_comment(comment):
     if cancel_incorrect_search_and_reply(comment, search_tags):
         return
 
-    posts = e621.search(search_tags, TAG_BLACKLIST, E621_HEADER, E621_AUTH, min_score=MIN_SCORE)
+    posts = e621.search(
+        search_tags, TAG_BLACKLIST, E621_HEADER, E621_AUTH, min_score=MIN_SCORE
+    )
 
     # if no posts were found, search again to make error message more specific
     if len(posts) == 0:
         # rate-limit
         time.sleep(1)
         # re-search posts without the score limit
-        posts = e621.search(search_tags, TAG_BLACKLIST, E621_HEADER, E621_AUTH, no_score_limit=True)
+        posts = e621.search(
+            search_tags, TAG_BLACKLIST, E621_HEADER, E621_AUTH, no_score_limit=True
+        )
         # which we use to explain why there were no results,
         # since the bot can sometimes be confusing to use
         if len(posts) == 0:
@@ -289,7 +305,9 @@ def process_comment(comment):
         # post_tag_list is still ordered based on the category order (artist, copyright, etc...)
 
         direct_link = f"[Direct Link]({first_post['file']['url']})"
-        link_text = f"[Post]({page_url}) | {direct_link} | Score: {first_post['score']['total']}"
+        link_text = (
+            f"[Post]({page_url}) | {direct_link} | Score: {first_post['score']['total']}"
+        )
 
     # create the small tag list
     if len(post_tag_list) == 0:
@@ -297,15 +315,14 @@ def process_comment(comment):
     else:
         # clean up tag list from any markdown characters
         post_tag_list = [
-            tag.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`") for tag in post_tag_list
+            tag.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`")
+            for tag in post_tag_list
         ]
 
         tags_text = f"**^^Post ^^Tags:** ^^{', ^^'.join(post_tag_list[:TAG_CUTOFF])}"
         # if there are more than 25, add an additional message, replacing the rest
         if len(post_tag_list) > TAG_CUTOFF:
-            tags_text += (
-                f", **^^and ^^{len(post_tag_list) - TAG_CUTOFF + removed_tags_count} ^^more ^^tags**"
-            )
+            tags_text += f", **^^and ^^{len(post_tag_list) - TAG_CUTOFF + removed_tags_count} ^^more ^^tags**"
         elif removed_tags_count > 0:
             tags_text += f", **^^and ^^{removed_tags_count} ^^more ^^tags**"
 
@@ -338,7 +355,9 @@ def process_comment(comment):
 # doesn't need a loop since it won't crash randomly
 print("Creating and starting deleter_thread")
 deleter_reddit = authenticate_reddit()
-deleter_thread = threading.Thread(target=deleter.deleter_function, args=(deleter_reddit,), daemon=True)
+deleter_thread = threading.Thread(
+    target=deleter.deleter_function, args=(deleter_reddit,), daemon=True
+)
 deleter_thread.start()
 
 # since PRAW doesn't handle the usual 503 errors caused by reddit's awful servers,
