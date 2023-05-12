@@ -6,3 +6,6 @@ implicated_tags.txt
 venv/
 win_venv/
 config.py
+__pycache__/
+comment_ids.txt
+start.sh
